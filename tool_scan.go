@@ -11,7 +11,7 @@ import (
 
 // ScanBarcodeInput defines the input parameters for the scan_barcode tool.
 type ScanBarcodeInput struct {
-	ImageData string `json:"image_data" jsonschema:"required,description=Base64-encoded image data (PNG\\, JPEG\\, GIF\\, TIFF\\, or BMP)"`
+	ImageData string `json:"image_data" jsonschema:"Base64-encoded image data (PNG, JPEG, GIF, TIFF, or BMP)"`
 }
 
 // makeScanHandler creates the handler for the scan_barcode tool.

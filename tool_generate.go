@@ -13,16 +13,16 @@ import (
 
 // GenerateBarcodeInput defines the input parameters for the generate_barcode tool.
 type GenerateBarcodeInput struct {
-	BarcodeType     string  `json:"barcode_type"     jsonschema:"required,description=Barcode symbology to generate (e.g. QR\\, Code128\\, DataMatrix\\, EAN13\\, PDF417)"`
-	Data            string  `json:"data"             jsonschema:"required,description=Data to encode in the barcode"`
-	ImageFormat     string  `json:"image_format"     jsonschema:"description=Output image format,enum=PNG,enum=JPEG,enum=SVG,enum=GIF,enum=TIFF"`
-	TextLocation    string  `json:"text_location"    jsonschema:"description=Where to display human-readable text on the barcode,enum=Below,enum=Above,enum=None"`
-	ForegroundColor string  `json:"foreground_color" jsonschema:"description=Foreground color as color name (e.g. Black) or #AARRGGBB hex"`
-	BackgroundColor string  `json:"background_color" jsonschema:"description=Background color as color name (e.g. White) or #AARRGGBB hex"`
-	Resolution      float64 `json:"resolution"       jsonschema:"description=Image resolution in DPI (1-100000)"`
-	RotationAngle   float64 `json:"rotation_angle"   jsonschema:"description=Rotation angle: 0\\, 90\\, 180\\, or 270 degrees"`
-	ImageWidth      float64 `json:"image_width"      jsonschema:"description=Image width in pixels"`
-	ImageHeight     float64 `json:"image_height"     jsonschema:"description=Image height in pixels"`
+	BarcodeType     string  `json:"barcode_type"                jsonschema:"Barcode symbology to generate (e.g. QR, Code128, DataMatrix, EAN13, PDF417)"`
+	Data            string  `json:"data"                        jsonschema:"Data to encode in the barcode"`
+	ImageFormat     string  `json:"image_format,omitempty"      jsonschema:"Output image format: PNG, JPEG, SVG, GIF, or TIFF"`
+	TextLocation    string  `json:"text_location,omitempty"     jsonschema:"Where to display human-readable text on the barcode: Below, Above, or None"`
+	ForegroundColor string  `json:"foreground_color,omitempty"  jsonschema:"Foreground color as color name (e.g. Black) or #AARRGGBB hex"`
+	BackgroundColor string  `json:"background_color,omitempty"  jsonschema:"Background color as color name (e.g. White) or #AARRGGBB hex"`
+	Resolution      float64 `json:"resolution,omitempty"        jsonschema:"Image resolution in DPI (1-100000)"`
+	RotationAngle   float64 `json:"rotation_angle,omitempty"    jsonschema:"Rotation angle: 0, 90, 180, or 270 degrees"`
+	ImageWidth      float64 `json:"image_width,omitempty"       jsonschema:"Image width in pixels"`
+	ImageHeight     float64 `json:"image_height,omitempty"      jsonschema:"Image height in pixels"`
 }
 
 // makeGenerateHandler creates the handler for the generate_barcode tool.
