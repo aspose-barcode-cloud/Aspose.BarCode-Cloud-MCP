@@ -4,7 +4,7 @@
 
 ```
 aspose-barcode-mcp/                 # root of the MCP server source (separate repo or subdirectory)
-├── main.go                         # Entry point: env validation, client init, server setup, tool registration, ServeStdio
+├── main.go                         # Entry point: env validation, client init, server setup, tool registration, StdioTransport
 ├── client.go                       # AsposeClient wrapper: auth context creation, SDK client lifecycle
 ├── tool_generate.go                # generate_barcode tool: definition + handler
 ├── tool_recognize.go               # recognize_barcode tool: definition + handler
@@ -26,9 +26,9 @@ aspose-barcode-mcp/                 # root of the MCP server source (separate re
 ### main.go
 - Read and validate `ASPOSE_CLIENT_ID` and `ASPOSE_CLIENT_SECRET` from environment
 - Create `AsposeClient` instance
-- Create MCP server via `server.NewMCPServer()`
-- Register all 4 tools with their handlers
-- Call `server.ServeStdio(s)` to start
+- Create MCP server via `mcp.NewServer(&mcp.Implementation{...}, nil)`
+- Register all 4 tools with `mcp.AddTool(s, &mcp.Tool{...}, handler)`
+- Call `s.Run(context.Background(), &mcp.StdioTransport{})` to start
 
 ### client.go
 - Define `AsposeClient` struct holding the SDK `*barcode.APIClient` and auth `context.Context`
@@ -38,7 +38,7 @@ aspose-barcode-mcp/                 # root of the MCP server source (separate re
 ### tool_generate.go
 - MCP tool definition for `generate_barcode` with all parameters
 - Handler function that:
-  1. Extracts and validates parameters from `mcp.CallToolRequest`
+  1. Receives typed input struct (auto-validated by SDK) from `mcp.CallToolRequest`
   2. Maps parameters to SDK `GenerateAPIGenerateOpts`
   3. Calls `client.GenerateAPI.Generate()`
   4. Returns image as base64 (`type: "image"`) or SVG as text (`type: "text"`)

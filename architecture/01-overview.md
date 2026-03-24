@@ -34,7 +34,7 @@ The **Aspose Barcode MCP Server** is a Go application that bridges MCP-compatibl
 | Component | Technology | Version |
 |-----------|-----------|---------|
 | Language | Go | 1.24+ |
-| MCP SDK | github.com/mark3labs/mcp-go | latest |
+| MCP SDK | github.com/modelcontextprotocol/go-sdk/mcp | latest |
 | Aspose SDK | github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4 | v4.2603.0 |
 | Container | Docker multi-stage (golang:1.24-alpine → alpine) | - |
 | License | MIT | - |

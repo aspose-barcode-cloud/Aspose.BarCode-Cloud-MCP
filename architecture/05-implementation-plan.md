@@ -14,7 +14,7 @@ Step-by-step implementation order. Each step is a self-contained unit that can b
    ```
 2. Add dependencies:
    ```bash
-   go get github.com/mark3labs/mcp-go
+   go get github.com/modelcontextprotocol/go-sdk/mcp
    go get github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4
    ```
 3. Create `main.go` with minimal MCP server (no tools yet):
@@ -22,23 +22,25 @@ Step-by-step implementation order. Each step is a self-contained unit that can b
    package main
 
    import (
+       "context"
        "log"
        "os"
 
-       "github.com/mark3labs/mcp-go/server"
+       "github.com/modelcontextprotocol/go-sdk/mcp"
    )
 
    func main() {
        log.SetOutput(os.Stderr)
 
-       s := server.NewMCPServer(
-           "aspose-barcode-cloud",
-           "0.2604.0",
-           server.WithToolCapabilities(false),
-           server.WithRecovery(),
+       s := mcp.NewServer(
+           &mcp.Implementation{
+               Name:    "aspose-barcode-cloud",
+               Version: "0.2604.0",
+           },
+           nil,
        )
 
-       if err := server.ServeStdio(s); err != nil {
+       if err := s.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
            log.Fatalf("Server error: %v", err)
        }
    }
@@ -86,9 +88,9 @@ Step-by-step implementation order. Each step is a self-contained unit that can b
 **Goal**: First working MCP tool — simplest one, no API call.
 
 1. Create `tool_list.go`
-2. Define tool with `mcp.NewTool("list_barcode_types", ...)`
-3. Implement handler: format and return type lists as text
-4. Register in `main.go`: `s.AddTool(listTool, listHandler)`
+2. Define input struct (empty — no parameters) and handler function
+3. Register with `mcp.AddTool(s, &mcp.Tool{Name: "list_barcode_types", ...}, handler)`
+4. Handler returns formatted type list as `&mcp.CallToolResult` with `TextContent`
 5. Test manually: run the server, send `tools/list` and `tools/call` via stdin JSON-RPC
 
 **Deliverables**: `tool_list.go`, updated `main.go`

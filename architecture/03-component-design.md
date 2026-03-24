@@ -6,7 +6,7 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                        main.go                                  │
 │  ┌──────────────┐   ┌──────────────────────────────────┐        │
-│  │ Env Config   │──>│ MCP Server (mcp-go)              │        │
+│  │ Env Config   │──>│ MCP Server (go-sdk)              │        │
 │  │ Validation   │   │                                  │        │
 │  └──────┬───────┘   │  ┌────────────────────────────┐  │        │
 │         │           │  │ Tool: generate_barcode     │  │        │
@@ -81,21 +81,37 @@ func NewAsposeClient(clientID, clientSecret string) (*AsposeClient, error) {
 
 ## Tool Handler Pattern
 
-Every tool handler follows this contract:
+Tools use the generic `mcp.AddTool` approach with typed input structs. The SDK auto-generates JSON Schema from struct tags and validates input before calling the handler:
 
 ```go
-func handleToolName(client *AsposeClient) server.ToolHandlerFunc {
-    return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-        // 1. Extract required parameters (return ToolResultError if missing)
-        // 2. Extract optional parameters with defaults
-        // 3. Call Aspose SDK via client
-        // 4. Format and return result (image or text)
-        // 5. On SDK error, return mcp.NewToolResultError() with message
+// Input struct — JSON Schema is derived from struct tags automatically
+type GenerateBarcodeInput struct {
+    BarcodeType string `json:"barcode_type" jsonschema:"required,description=Barcode symbology to generate"`
+    Data        string `json:"data"         jsonschema:"required,description=Data to encode in the barcode"`
+    ImageFormat string `json:"image_format" jsonschema:"description=Output image format,enum=PNG,enum=JPEG,enum=SVG"`
+}
+
+// Handler function — receives typed, pre-validated input
+func makeGenerateHandler(client *AsposeClient) mcp.ToolHandlerFor[GenerateBarcodeInput, any] {
+    return func(ctx context.Context, req *mcp.CallToolRequest, input GenerateBarcodeInput) (*mcp.CallToolResult, any, error) {
+        // 1. Map input fields to SDK types
+        // 2. Call Aspose SDK via client
+        // 3. Return result or error
+        // On error: return nil, nil, fmt.Errorf("...") — SDK wraps into IsError response
+        return &mcp.CallToolResult{
+            Content: []mcp.Content{&mcp.TextContent{Text: "result"}},
+        }, nil, nil
     }
 }
+
+// Registration
+mcp.AddTool(s, &mcp.Tool{
+    Name:        "generate_barcode",
+    Description: "Generate a barcode image...",
+}, makeGenerateHandler(client))
 ```
 
-Handlers are **closures** that capture the `*AsposeClient`. This avoids globals and makes testing straightforward (inject a mock client).
+Handlers are created via **factory functions** that capture the `*AsposeClient`. This avoids globals and makes testing straightforward (inject a mock client).
 
 ## Data Flow: generate_barcode
 
@@ -144,14 +160,16 @@ MCP Host                    MCP Server                          Aspose Cloud API
 
 ## Error Handling
 
-All errors are returned as `mcp.NewToolResultError(message)` — **never** as Go `error` return values. This ensures the MCP host receives a proper error content block rather than a protocol-level error.
+Tool errors are returned as Go `error` values from the handler. The SDK automatically wraps them into a `CallToolResult` with `IsError: true` and the error message as `TextContent`. This ensures the MCP host receives a proper error content block rather than a protocol-level error.
+
+Required parameter validation is handled automatically by the SDK via the JSON Schema derived from input struct `jsonschema:"required"` tags.
 
 | Error Scenario | Handling |
 |---------------|----------|
-| Missing required parameter | `mcp.NewToolResultError("parameter 'data' is required")` |
-| Invalid base64 input | `mcp.NewToolResultError("invalid base64 image data: ...")` |
-| Aspose API error (4xx/5xx) | `mcp.NewToolResultError("Aspose API error: <message from response>")` |
-| Network error | `mcp.NewToolResultError("failed to connect to Aspose API: ...")` |
+| Missing required parameter | Automatic — SDK validates against JSON Schema before handler is called |
+| Invalid base64 input | `return nil, nil, fmt.Errorf("invalid base64 image data: %w", err)` |
+| Aspose API error (4xx/5xx) | `return nil, nil, fmt.Errorf("Aspose API error: %s", message)` |
+| Network error | `return nil, nil, fmt.Errorf("failed to connect to Aspose API: %w", err)` |
 | Missing credentials (startup) | `log.Fatalf()` — server refuses to start |
 
 ## Logging
