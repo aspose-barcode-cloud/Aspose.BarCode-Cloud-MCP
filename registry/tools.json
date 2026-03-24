@@ -1,0 +1,69 @@
+[
+  {
+    "name": "generate_barcode",
+    "description": "Generate a barcode image of the specified type encoding the given data. Returns the image as base64-encoded content.",
+    "arguments": [
+      {
+        "name": "barcode_type",
+        "type": "string",
+        "desc": "Barcode symbology (e.g., QR, Code128, DataMatrix, EAN13, PDF417)",
+        "required": true
+      },
+      {
+        "name": "data",
+        "type": "string",
+        "desc": "Data to encode in the barcode",
+        "required": true
+      },
+      {
+        "name": "image_format",
+        "type": "string",
+        "desc": "Output format: PNG (default), JPEG, SVG, GIF, TIFF"
+      },
+      {
+        "name": "text_location",
+        "type": "string",
+        "desc": "Text position: Below, Above, None. Default depends on barcode type"
+      }
+    ]
+  },
+  {
+    "name": "recognize_barcode",
+    "description": "Recognize barcodes of a specific type from a base64-encoded image. Allows specifying barcode types and recognition quality.",
+    "arguments": [
+      {
+        "name": "image_data",
+        "type": "string",
+        "desc": "Base64-encoded image data",
+        "required": true
+      },
+      {
+        "name": "barcode_type",
+        "type": "string",
+        "desc": "Types to look for (e.g., QR, Code128). Default: most commonly used types"
+      },
+      {
+        "name": "recognition_mode",
+        "type": "string",
+        "desc": "Quality vs speed: Fast, Normal (default), Excellent"
+      }
+    ]
+  },
+  {
+    "name": "scan_barcode",
+    "description": "Automatically detect and read most common barcodes in a base64-encoded image without specifying barcode type.",
+    "arguments": [
+      {
+        "name": "image_data",
+        "type": "string",
+        "desc": "Base64-encoded image data",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_barcode_types",
+    "description": "List all supported barcode types for generation and recognition.",
+    "arguments": []
+  }
+]

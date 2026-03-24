@@ -39,8 +39,8 @@ import (
     "context"
     "fmt"
 
-    barcode "github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4"
-    "golang.org/x/oauth2"
+    "github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
+    "golang.org/x/oauth2/jwt"
 )
 
 // AsposeClient wraps the Aspose Barcode Cloud SDK client with authentication.
@@ -56,19 +56,19 @@ func NewAsposeClient(clientID, clientSecret string) (*AsposeClient, error) {
         return nil, fmt.Errorf("ASPOSE_CLIENT_ID and ASPOSE_CLIENT_SECRET must be set")
     }
 
-    conf := barcode.NewConfiguration()
-    conf.OAuthTokenUrl = "https://id.aspose.cloud/connect/token"
-    conf.OAuthClientId = clientID
-    conf.OAuthClientSecret = clientSecret
-    apiClient := barcode.NewAPIClient(conf)
+    // Create JWT config for OAuth 2.0 token acquisition
+    jwtConf := jwt.NewConfig(clientID, clientSecret)
 
-    // Create JWT-authenticated context
-    // Note: Actual auth context setup depends on SDK v4 API.
-    // The SDK uses oauth2 internally; the developer should verify
-    // the exact pattern from SDK examples.
-    jwtConf := &oauth2.Config{} // placeholder — see SDK docs
-    _ = jwtConf
-    authCtx := context.Background() // will be replaced with real auth context
+    // Create auth context with JWT token source
+    // The SDK uses barcode.ContextJWT key to extract the token source
+    authCtx := context.WithValue(
+        context.Background(),
+        barcode.ContextJWT,
+        jwtConf.TokenSource(context.Background()),
+    )
+
+    // Create SDK client with default configuration
+    apiClient := barcode.NewAPIClient(barcode.NewConfiguration())
 
     return &AsposeClient{
         API:     apiClient,
@@ -76,8 +76,6 @@ func NewAsposeClient(clientID, clientSecret string) (*AsposeClient, error) {
     }, nil
 }
 ```
-
-**Developer note**: The exact auth context setup must follow the SDK's documented pattern. See [investigation/02-aspose-barcode-cloud-api.md](../investigation/02-aspose-barcode-cloud-api.md) Authentication section for the reference code using `jwt.NewConfig()`.
 
 ## Tool Handler Pattern
 
@@ -92,15 +90,17 @@ type GenerateBarcodeInput struct {
 }
 
 // Handler function — receives typed, pre-validated input
-func makeGenerateHandler(client *AsposeClient) mcp.ToolHandlerFor[GenerateBarcodeInput, any] {
-    return func(ctx context.Context, req *mcp.CallToolRequest, input GenerateBarcodeInput) (*mcp.CallToolResult, any, error) {
+// Signature: func(ctx, *ServerSession, *CallToolParamsFor[Input]) (*CallToolResult, error)
+func makeGenerateHandler(client *AsposeClient) func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[GenerateBarcodeInput]) (*mcp.CallToolResult, error) {
+    return func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[GenerateBarcodeInput]) (*mcp.CallToolResult, error) {
+        input := params.Input
         // 1. Map input fields to SDK types
         // 2. Call Aspose SDK via client
         // 3. Return result or error
-        // On error: return nil, nil, fmt.Errorf("...") — SDK wraps into IsError response
+        // On error: return nil, fmt.Errorf("...") — SDK wraps into IsError response
         return &mcp.CallToolResult{
             Content: []mcp.Content{&mcp.TextContent{Text: "result"}},
-        }, nil, nil
+        }, nil
     }
 }
 
@@ -167,9 +167,9 @@ Required parameter validation is handled automatically by the SDK via the JSON S
 | Error Scenario | Handling |
 |---------------|----------|
 | Missing required parameter | Automatic — SDK validates against JSON Schema before handler is called |
-| Invalid base64 input | `return nil, nil, fmt.Errorf("invalid base64 image data: %w", err)` |
-| Aspose API error (4xx/5xx) | `return nil, nil, fmt.Errorf("Aspose API error: %s", message)` |
-| Network error | `return nil, nil, fmt.Errorf("failed to connect to Aspose API: %w", err)` |
+| Invalid base64 input | `return nil, fmt.Errorf("invalid base64 image data: %w", err)` |
+| Aspose API error (4xx/5xx) | `return nil, fmt.Errorf("Aspose API error: %s", message)` |
+| Network error | `return nil, fmt.Errorf("failed to connect to Aspose API: %w", err)` |
 | Missing credentials (startup) | `log.Fatalf()` — server refuses to start |
 
 ## Logging

@@ -38,7 +38,7 @@ aspose-barcode-mcp/                 # root of the MCP server source (separate re
 ### tool_generate.go
 - MCP tool definition for `generate_barcode` with all parameters
 - Handler function that:
-  1. Receives typed input struct (auto-validated by SDK) from `mcp.CallToolRequest`
+  1. Receives typed input struct (auto-validated by SDK) via `*mcp.CallToolParamsFor[GenerateBarcodeInput]`
   2. Maps parameters to SDK `GenerateAPIGenerateOpts`
   3. Calls `client.GenerateAPI.Generate()`
   4. Returns image as base64 (`type: "image"`) or SVG as text (`type: "text"`)

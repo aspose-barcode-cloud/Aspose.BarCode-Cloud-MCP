@@ -15,7 +15,7 @@ Step-by-step implementation order. Each step is a self-contained unit that can b
 2. Add dependencies:
    ```bash
    go get github.com/modelcontextprotocol/go-sdk/mcp
-   go get github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4
+   go get github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode
    ```
 3. Create `main.go` with minimal MCP server (no tools yet):
    ```go
@@ -63,9 +63,10 @@ Step-by-step implementation order. Each step is a self-contained unit that can b
 **Deliverables**: `client.go`, updated `main.go`
 
 **Developer notes**:
-- Study the SDK source at `github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4` to understand the exact auth pattern for v4
-- The investigation shows a `jwt.NewConfig()` pattern — verify this exists in v4 SDK
-- If the SDK config struct has fields for OAuthClientId/OAuthClientSecret, use those directly instead of manual JWT setup
+- Import the SDK sub-package: `github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode`
+- Auth uses `jwt.NewConfig(clientID, clientSecret)` + `context.WithValue(ctx, barcode.ContextJWT, tokenSource)`
+- The SDK `Configuration` struct does NOT have `OAuthClientId`/`OAuthClientSecret` fields — use the `jwt` + context pattern above
+- See [03-component-design.md](03-component-design.md) AsposeClient section for the complete code
 
 ---
 

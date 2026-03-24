@@ -104,7 +104,7 @@ config:
       {
         "name": "image_format",
         "type": "string",
-        "desc": "Output format: PNG (default), JPEG, SVG, GIF, TIFF, BMP"
+        "desc": "Output format: PNG (default), JPEG, SVG, GIF, TIFF"
       },
       {
         "name": "text_location",

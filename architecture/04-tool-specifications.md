@@ -14,7 +14,7 @@ Detailed specifications for each MCP tool. These use the official `github.com/mo
 type GenerateBarcodeInput struct {
     BarcodeType     string  `json:"barcode_type"     jsonschema:"required,description=Barcode symbology to generate (e.g. QR\\, Code128\\, DataMatrix\\, EAN13\\, PDF417)"`
     Data            string  `json:"data"             jsonschema:"required,description=Data to encode in the barcode"`
-    ImageFormat     string  `json:"image_format"     jsonschema:"description=Output image format,enum=PNG,enum=JPEG,enum=SVG,enum=GIF,enum=TIFF,enum=BMP"`
+    ImageFormat     string  `json:"image_format"     jsonschema:"description=Output image format,enum=PNG,enum=JPEG,enum=SVG,enum=GIF,enum=TIFF"`
     TextLocation    string  `json:"text_location"    jsonschema:"description=Where to display human-readable text on the barcode,enum=Below,enum=Above,enum=None"`
     ForegroundColor string  `json:"foreground_color" jsonschema:"description=Foreground color as color name (e.g. Black) or #AARRGGBB hex"`
     BackgroundColor string  `json:"background_color" jsonschema:"description=Background color as color name (e.g. White) or #AARRGGBB hex"`
@@ -43,9 +43,9 @@ mcp.AddTool(s, &mcp.Tool{
 6. input.Resolution, input.RotationAngle, input.ImageWidth, input.ImageHeight → numeric opts if non-zero
 7. Build barcode.GenerateAPIGenerateOpts struct
 8. Call client.API.GenerateAPI.Generate(client.AuthCtx, barcodeType, data, &opts)
-9. If error → return nil, nil, fmt.Errorf("...") (SDK wraps into IsError response)
-10. If SVG format → return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: svgString}}}
-11. Else → return &mcp.CallToolResult{Content: []mcp.Content{&mcp.ImageContent{Data: base64String, MIMEType: "image/png"}}}
+9. If error → return nil, fmt.Errorf("...")
+10. If SVG format → return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: svgString}}}, nil
+11. Else → return &mcp.CallToolResult{Content: []mcp.Content{&mcp.ImageContent{Data: base64String, MIMEType: "image/png"}}}, nil
 ```
 
 ### SDK Call Reference
@@ -74,7 +74,7 @@ imageBytes, httpResp, err := client.API.GenerateAPI.Generate(
 
 ```go
 type RecognizeBarcodeInput struct {
-    ImageData          string `json:"image_data"            jsonschema:"required,description=Base64-encoded image data (PNG\\, JPEG\\, GIF\\, TIFF\\, or BMP)"`
+    ImageData          string `json:"image_data"            jsonschema:"required,description=Base64-encoded image data (PNG\\, JPEG\\, GIF\\, or TIFF)"`
     BarcodeType        string `json:"barcode_type"          jsonschema:"description=Barcode type to look for (e.g. QR\\, Code128). You can pass many types. Default: most commonly used types"`
     RecognitionMode    string `json:"recognition_mode"      jsonschema:"description=Recognition quality vs speed trade-off,enum=Fast,enum=Normal,enum=Excellent"`
     RecognitionImageKind string `json:"recognition_image_kind" jsonschema:"description=Hint about the image source for better recognition,enum=Photo,enum=ScannedDocument,enum=ClearImage"`
@@ -98,10 +98,10 @@ mcp.AddTool(s, &mcp.Tool{
 5. Use RecognizeBase64 endpoint (preferred — avoids temp files):
    - Build request body with base64 image data
    - Call client.API.RecognizeAPI.RecognizeBase64(client.AuthCtx, body)
-6. If error → return nil, nil, fmt.Errorf("...") (SDK wraps into IsError response)
+6. If error → return nil, fmt.Errorf("...")
 7. Format BarcodeResponseList as structured text:
    "Found N barcode(s):\n\n1. Type: QR\n   Value: hello\n   Checksum: ...\n\n2. ..."
-8. Return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: formattedText}}}
+8. Return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: formattedText}}}, nil
 ```
 
 ### SDK Call Reference (RecognizeBase64)
@@ -109,7 +109,7 @@ mcp.AddTool(s, &mcp.Tool{
 ```go
 body := barcode.RecognizeBase64Request{
     BarcodeTypes: []barcode.DecodeBarcodeType{barcode.DecodeBarcodeTypeQR},
-    BarcodeImage: base64ImageString,
+    FileBase64: base64ImageString,
 }
 result, httpResp, err := client.API.RecognizeAPI.RecognizeBase64(client.AuthCtx, body)
 // result.Barcodes contains []BarcodeResponse
@@ -125,7 +125,7 @@ result, httpResp, err := client.API.RecognizeAPI.RecognizeBase64(client.AuthCtx,
 
 ```go
 type ScanBarcodeInput struct {
-    ImageData string `json:"image_data" jsonschema:"required,description=Base64-encoded image data (PNG\\, JPEG\\, GIF\\, TIFF\\, or BMP)"`
+    ImageData string `json:"image_data" jsonschema:"required,description=Base64-encoded image data (PNG\\, JPEG\\, GIF\\, or TIFF)"`
 }
 
 mcp.AddTool(s, &mcp.Tool{
@@ -143,18 +143,18 @@ mcp.AddTool(s, &mcp.Tool{
 2. Use ScanBase64 endpoint (preferred):
    - Build request body with base64 image data
    - Call client.API.ScanAPI.ScanBase64(client.AuthCtx, body)
-3. If error → return nil, nil, fmt.Errorf("...") (SDK wraps into IsError response)
+3. If error → return nil, fmt.Errorf("...")
 4. Format BarcodeResponseList as structured text:
    "Found N barcode(s):\n\n1. Type: QR\n   Value: hello\n\n2. ..."
 5. If no barcodes found → return "No barcodes detected in the image."
-6. Return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: formattedText}}}
+6. Return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: formattedText}}}, nil
 ```
 
 ### SDK Call Reference
 
 ```go
 body := barcode.ScanBase64Request{
-    BarcodeImage: base64ImageString,
+    FileBase64: base64ImageString,
 }
 result, httpResp, err := client.API.ScanAPI.ScanBase64(client.AuthCtx, body)
 ```
@@ -184,7 +184,7 @@ mcp.AddTool(s, &mcp.Tool{
 2. Build formatted text from barcode_types.go constants:
    "Supported barcode types for GENERATION:\n- QR\n- Code128\n- ...\n\n
     Supported barcode types for RECOGNITION:\n- QR\n- Code128\n- ..."
-3. Return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: formattedText}}}
+3. Return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: formattedText}}}, nil
 ```
 
 ---
