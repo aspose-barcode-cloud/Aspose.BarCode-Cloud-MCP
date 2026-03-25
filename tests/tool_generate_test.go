@@ -1,9 +1,11 @@
-package main
+package tests
 
 import (
 	"testing"
 
 	"github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
+
+	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
 )
 
 func TestMapImageFormat_ValidFormats(t *testing.T) {
@@ -28,12 +30,12 @@ func TestMapImageFormat_ValidFormats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result, err := mapImageFormat(tt.input)
+			result, err := mcpbarcode.MapImageFormat(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error for %q: %v", tt.input, err)
 			}
 			if result != tt.expected {
-				t.Errorf("mapImageFormat(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("MapImageFormat(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -43,7 +45,7 @@ func TestMapImageFormat_InvalidFormat(t *testing.T) {
 	invalidFormats := []string{"BMP", "WEBP", "", "invalid"}
 	for _, f := range invalidFormats {
 		t.Run(f, func(t *testing.T) {
-			_, err := mapImageFormat(f)
+			_, err := mcpbarcode.MapImageFormat(f)
 			if err == nil {
 				t.Fatalf("expected error for format %q, got nil", f)
 			}
@@ -67,12 +69,12 @@ func TestMapCodeLocation_ValidLocations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result, err := mapCodeLocation(tt.input)
+			result, err := mcpbarcode.MapCodeLocation(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error for %q: %v", tt.input, err)
 			}
 			if result != tt.expected {
-				t.Errorf("mapCodeLocation(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("MapCodeLocation(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -82,7 +84,7 @@ func TestMapCodeLocation_InvalidLocation(t *testing.T) {
 	invalidLocations := []string{"Left", "Right", "", "invalid"}
 	for _, loc := range invalidLocations {
 		t.Run(loc, func(t *testing.T) {
-			_, err := mapCodeLocation(loc)
+			_, err := mcpbarcode.MapCodeLocation(loc)
 			if err == nil {
 				t.Fatalf("expected error for location %q, got nil", loc)
 			}
@@ -104,9 +106,9 @@ func TestMimeTypeForFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.input), func(t *testing.T) {
-			result := mimeTypeForFormat(tt.input)
+			result := mcpbarcode.MimeTypeForFormat(tt.input)
 			if result != tt.expected {
-				t.Errorf("mimeTypeForFormat(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("MimeTypeForFormat(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}

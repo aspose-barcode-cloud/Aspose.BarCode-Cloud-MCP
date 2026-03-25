@@ -94,8 +94,8 @@ Minimal image size, no Go toolchain in production.
 ### 6. Configuration
 
 **Environment variables** (set via Docker MCP Registry secrets mechanism):
-- `ASPOSE_CLIENT_ID` (required, secret)
-- `ASPOSE_CLIENT_SECRET` (required, secret)
+- `ASPOSE_CLOUD_CLIENT_ID` (required, secret)
+- `ASPOSE_CLOUD_CLIENT_SECRET` (required, secret)
 
 No other configuration needed. API base URL uses SDK defaults.
 

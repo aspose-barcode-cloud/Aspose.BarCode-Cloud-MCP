@@ -1,36 +1,34 @@
-package main
+package tests
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+
+	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
 )
 
 // createTestServer creates an MCP server with only the list_barcode_types tool
 // registered (no API credentials needed).
-func createTestServer() *mcp.Server {
-	s := mcp.NewServer(
-		&mcp.Implementation{
-			Name:    "aspose-barcode-cloud",
-			Version: "test",
-		},
-		nil,
-	)
+func createTestServer() *server.MCPServer {
+	s := server.NewMCPServer("aspose-barcode-cloud", "test")
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "list_barcode_types",
-		Description: "List all supported barcode types for generation and recognition. " +
-			"Use this to discover valid barcode_type values for generate_barcode and recognize_barcode.",
-	}, makeListHandler())
+	s.AddTool(mcp.NewTool("list_barcode_types",
+		mcp.WithDescription("List all supported barcode types for generation and recognition. "+
+			"Use this to discover valid barcode_type values for generate_barcode and recognize_barcode."),
+		mcp.WithInputSchema[mcpbarcode.ListBarcodeTypesInput](),
+	), mcpbarcode.MakeListHandler())
 
 	return s
 }
 
 // createFullServer creates an MCP server with all 4 tools registered.
 // Returns nil if tool registration panics (e.g. due to jsonschema tag issues).
-func createFullServer(t *testing.T) (s *mcp.Server) {
+func createFullServer(t *testing.T) (s *server.MCPServer) {
 	t.Helper()
 
 	defer func() {
@@ -39,64 +37,64 @@ func createFullServer(t *testing.T) (s *mcp.Server) {
 		}
 	}()
 
-	s = mcp.NewServer(
-		&mcp.Implementation{Name: "aspose-barcode-cloud", Version: "test"},
-		nil,
-	)
+	s = server.NewMCPServer("aspose-barcode-cloud", "test")
 
-	dummyClient := &AsposeClient{}
+	dummyClient := &mcpbarcode.AsposeClient{}
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "generate_barcode",
-		Description: "Generate a barcode image",
-	}, makeGenerateHandler(dummyClient))
+	s.AddTool(mcp.NewTool("generate_barcode",
+		mcp.WithDescription("Generate a barcode image"),
+		mcp.WithInputSchema[mcpbarcode.GenerateBarcodeInput](),
+	), mcpbarcode.MakeGenerateHandler(dummyClient))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "recognize_barcode",
-		Description: "Recognize barcodes from an image",
-	}, makeRecognizeHandler(dummyClient))
+	s.AddTool(mcp.NewTool("recognize_barcode",
+		mcp.WithDescription("Recognize barcodes from an image"),
+		mcp.WithInputSchema[mcpbarcode.RecognizeBarcodeInput](),
+	), mcpbarcode.MakeRecognizeHandler(dummyClient))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "scan_barcode",
-		Description: "Scan barcodes from an image",
-	}, makeScanHandler(dummyClient))
+	s.AddTool(mcp.NewTool("scan_barcode",
+		mcp.WithDescription("Scan barcodes from an image"),
+		mcp.WithInputSchema[mcpbarcode.ScanBarcodeInput](),
+	), mcpbarcode.MakeScanHandler(dummyClient))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_barcode_types",
-		Description: "List supported barcode types",
-	}, makeListHandler())
+	s.AddTool(mcp.NewTool("list_barcode_types",
+		mcp.WithDescription("List supported barcode types"),
+		mcp.WithInputSchema[mcpbarcode.ListBarcodeTypesInput](),
+	), mcpbarcode.MakeListHandler())
 
 	return s
 }
 
-// connectTestClient creates in-memory client+server sessions for testing.
-func connectTestClient(t *testing.T, s *mcp.Server) *mcp.ClientSession {
+// connectTestClient creates an in-process client connected to the server.
+func connectTestClient(t *testing.T, s *server.MCPServer) *client.Client {
 	t.Helper()
 	ctx := context.Background()
 
-	clientTransport, serverTransport := mcp.NewInMemoryTransports()
-
-	serverSession, err := s.Connect(ctx, serverTransport)
+	c, err := client.NewInProcessClient(s)
 	if err != nil {
-		t.Fatalf("server connect error: %v", err)
+		t.Fatalf("failed to create in-process client: %v", err)
 	}
-	t.Cleanup(func() { serverSession.Wait() })
 
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1.0"}, nil)
-	clientSession, err := client.Connect(ctx, clientTransport)
-	if err != nil {
-		t.Fatalf("client connect error: %v", err)
+	if err := c.Start(ctx); err != nil {
+		t.Fatalf("failed to start client: %v", err)
 	}
-	t.Cleanup(func() { clientSession.Close() })
 
-	return clientSession
+	initReq := mcp.InitializeRequest{}
+	initReq.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+	initReq.Params.ClientInfo = mcp.Implementation{Name: "test-client", Version: "1.0"}
+
+	if _, err := c.Initialize(ctx, initReq); err != nil {
+		t.Fatalf("failed to initialize client: %v", err)
+	}
+
+	t.Cleanup(func() { c.Close() })
+	return c
 }
 
 func TestMCPProtocol_ListTools(t *testing.T) {
-	server := createTestServer()
-	cs := connectTestClient(t, server)
+	s := createTestServer()
+	cs := connectTestClient(t, s)
 
-	result, err := cs.ListTools(context.Background(), nil)
+	result, err := cs.ListTools(context.Background(), mcp.ListToolsRequest{})
 	if err != nil {
 		t.Fatalf("ListTools error: %v", err)
 	}
@@ -115,12 +113,14 @@ func TestMCPProtocol_ListTools(t *testing.T) {
 }
 
 func TestMCPProtocol_CallListBarcodeTypes(t *testing.T) {
-	server := createTestServer()
-	cs := connectTestClient(t, server)
+	s := createTestServer()
+	cs := connectTestClient(t, s)
 
-	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "list_barcode_types",
-		Arguments: map[string]any{},
+	result, err := cs.CallTool(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      "list_barcode_types",
+			Arguments: map[string]any{},
+		},
 	})
 	if err != nil {
 		t.Fatalf("CallTool error: %v", err)
@@ -134,7 +134,7 @@ func TestMCPProtocol_CallListBarcodeTypes(t *testing.T) {
 		t.Fatalf("expected 1 content block, got %d", len(result.Content))
 	}
 
-	textContent, ok := result.Content[0].(*mcp.TextContent)
+	textContent, ok := result.Content[0].(mcp.TextContent)
 	if !ok {
 		t.Fatalf("expected TextContent, got %T", result.Content[0])
 	}
@@ -145,18 +145,20 @@ func TestMCPProtocol_CallListBarcodeTypes(t *testing.T) {
 }
 
 func TestMCPProtocol_CallListBarcodeTypes_ContentCheck(t *testing.T) {
-	server := createTestServer()
-	cs := connectTestClient(t, server)
+	s := createTestServer()
+	cs := connectTestClient(t, s)
 
-	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "list_barcode_types",
-		Arguments: map[string]any{},
+	result, err := cs.CallTool(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      "list_barcode_types",
+			Arguments: map[string]any{},
+		},
 	})
 	if err != nil {
 		t.Fatalf("CallTool error: %v", err)
 	}
 
-	text := result.Content[0].(*mcp.TextContent).Text
+	text := result.Content[0].(mcp.TextContent).Text
 
 	// Verify key barcode types appear in the output
 	expectedTypes := []string{"QR", "Code128", "DataMatrix", "EAN13", "Pdf417", "MostCommonlyUsed"}
@@ -176,12 +178,14 @@ func TestMCPProtocol_CallListBarcodeTypes_ContentCheck(t *testing.T) {
 }
 
 func TestMCPProtocol_CallNonexistentTool(t *testing.T) {
-	server := createTestServer()
-	cs := connectTestClient(t, server)
+	s := createTestServer()
+	cs := connectTestClient(t, s)
 
-	_, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "nonexistent_tool",
-		Arguments: map[string]any{},
+	_, err := cs.CallTool(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      "nonexistent_tool",
+			Arguments: map[string]any{},
+		},
 	})
 	// The MCP SDK should return an error for unknown tools
 	if err == nil {
@@ -190,17 +194,17 @@ func TestMCPProtocol_CallNonexistentTool(t *testing.T) {
 }
 
 func TestMCPProtocol_ToolSchemaValidation(t *testing.T) {
-	server := createTestServer()
-	cs := connectTestClient(t, server)
+	s := createTestServer()
+	cs := connectTestClient(t, s)
 
-	result, err := cs.ListTools(context.Background(), nil)
+	result, err := cs.ListTools(context.Background(), mcp.ListToolsRequest{})
 	if err != nil {
 		t.Fatalf("ListTools error: %v", err)
 	}
 
 	for _, tool := range result.Tools {
-		if tool.InputSchema == nil {
-			t.Errorf("tool %q has nil input schema", tool.Name)
+		if tool.InputSchema.Type == "" {
+			t.Errorf("tool %q has empty input schema type", tool.Name)
 		}
 	}
 }
@@ -216,7 +220,7 @@ func TestMCPProtocol_FullServerToolRegistration(t *testing.T) {
 
 	cs := connectTestClient(t, s)
 
-	result, err := cs.ListTools(context.Background(), nil)
+	result, err := cs.ListTools(context.Background(), mcp.ListToolsRequest{})
 	if err != nil {
 		t.Fatalf("ListTools error: %v", err)
 	}
@@ -248,14 +252,14 @@ func TestMCPProtocol_FullServerSchemas(t *testing.T) {
 
 	cs := connectTestClient(t, s)
 
-	result, err := cs.ListTools(context.Background(), nil)
+	result, err := cs.ListTools(context.Background(), mcp.ListToolsRequest{})
 	if err != nil {
 		t.Fatalf("ListTools error: %v", err)
 	}
 
 	for _, tool := range result.Tools {
-		if tool.InputSchema == nil {
-			t.Errorf("tool %q has nil input schema", tool.Name)
+		if tool.InputSchema.Type == "" {
+			t.Errorf("tool %q has empty input schema type", tool.Name)
 		}
 		if tool.Description == "" {
 			t.Errorf("tool %q has empty description", tool.Name)

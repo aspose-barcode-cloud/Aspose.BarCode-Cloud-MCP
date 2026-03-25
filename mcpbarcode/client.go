@@ -1,4 +1,4 @@
-package main
+package mcpbarcode
 
 import (
 	"context"
@@ -17,7 +17,7 @@ type AsposeClient struct {
 // NewAsposeClient creates a new authenticated Aspose Barcode Cloud client.
 func NewAsposeClient(clientID, clientSecret string) (*AsposeClient, error) {
 	if clientID == "" || clientSecret == "" {
-		return nil, fmt.Errorf("ASPOSE_CLIENT_ID and ASPOSE_CLIENT_SECRET must be set")
+		return nil, fmt.Errorf("ASPOSE_CLOUD_CLIENT_ID and ASPOSE_CLOUD_CLIENT_SECRET must be set")
 	}
 
 	jwtConf := jwt.NewConfig(clientID, clientSecret)

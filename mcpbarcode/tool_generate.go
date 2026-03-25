@@ -1,4 +1,4 @@
-package main
+package mcpbarcode
 
 import (
 	"context"
@@ -8,30 +8,34 @@ import (
 
 	"github.com/antihax/optional"
 	"github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // GenerateBarcodeInput defines the input parameters for the generate_barcode tool.
 type GenerateBarcodeInput struct {
-	BarcodeType     string  `json:"barcode_type"                jsonschema:"Barcode symbology to generate (e.g. QR, Code128, DataMatrix, EAN13, PDF417)"`
-	Data            string  `json:"data"                        jsonschema:"Data to encode in the barcode"`
-	ImageFormat     string  `json:"image_format,omitempty"      jsonschema:"Output image format: PNG, JPEG, SVG, GIF, or TIFF"`
-	TextLocation    string  `json:"text_location,omitempty"     jsonschema:"Where to display human-readable text on the barcode: Below, Above, or None"`
-	ForegroundColor string  `json:"foreground_color,omitempty"  jsonschema:"Foreground color as color name (e.g. Black) or #AARRGGBB hex"`
-	BackgroundColor string  `json:"background_color,omitempty"  jsonschema:"Background color as color name (e.g. White) or #AARRGGBB hex"`
-	Resolution      float64 `json:"resolution,omitempty"        jsonschema:"Image resolution in DPI (1-100000)"`
-	RotationAngle   float64 `json:"rotation_angle,omitempty"    jsonschema:"Rotation angle: 0, 90, 180, or 270 degrees"`
-	ImageWidth      float64 `json:"image_width,omitempty"       jsonschema:"Image width in pixels"`
-	ImageHeight     float64 `json:"image_height,omitempty"      jsonschema:"Image height in pixels"`
+	BarcodeType     string  `json:"barcode_type"                jsonschema:"description=Barcode symbology to generate (e.g. QR, Code128, DataMatrix, EAN13, PDF417)"`
+	Data            string  `json:"data"                        jsonschema:"description=Data to encode in the barcode"`
+	ImageFormat     string  `json:"image_format,omitempty"      jsonschema:"description=Output image format: PNG, JPEG, SVG, GIF, or TIFF"`
+	TextLocation    string  `json:"text_location,omitempty"     jsonschema:"description=Where to display human-readable text on the barcode: Below, Above, or None"`
+	ForegroundColor string  `json:"foreground_color,omitempty"  jsonschema:"description=Foreground color as color name (e.g. Black) or #AARRGGBB hex"`
+	BackgroundColor string  `json:"background_color,omitempty"  jsonschema:"description=Background color as color name (e.g. White) or #AARRGGBB hex"`
+	Resolution      float64 `json:"resolution,omitempty"        jsonschema:"description=Image resolution in DPI (1-100000)"`
+	RotationAngle   float64 `json:"rotation_angle,omitempty"    jsonschema:"description=Rotation angle: 0, 90, 180, or 270 degrees"`
+	ImageWidth      float64 `json:"image_width,omitempty"       jsonschema:"description=Image width in pixels"`
+	ImageHeight     float64 `json:"image_height,omitempty"      jsonschema:"description=Image height in pixels"`
 }
 
-// makeGenerateHandler creates the handler for the generate_barcode tool.
-func makeGenerateHandler(client *AsposeClient) mcp.ToolHandlerFor[GenerateBarcodeInput, any] {
-	return func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[GenerateBarcodeInput]) (*mcp.CallToolResult, error) {
-		input := params.Arguments
+// MakeGenerateHandler creates the handler for the generate_barcode tool.
+func MakeGenerateHandler(client *AsposeClient) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var input GenerateBarcodeInput
+		if err := request.BindArguments(&input); err != nil {
+			return nil, fmt.Errorf("invalid arguments: %w", err)
+		}
 
 		// Map barcode type
-		barcodeType, err := mapEncodeType(input.BarcodeType)
+		barcodeType, err := MapEncodeType(input.BarcodeType)
 		if err != nil {
 			return nil, err
 		}
@@ -42,7 +46,7 @@ func makeGenerateHandler(client *AsposeClient) mcp.ToolHandlerFor[GenerateBarcod
 		// Image format
 		imageFormat := barcode.BarcodeImageFormatPng
 		if input.ImageFormat != "" {
-			mapped, err := mapImageFormat(input.ImageFormat)
+			mapped, err := MapImageFormat(input.ImageFormat)
 			if err != nil {
 				return nil, err
 			}
@@ -52,7 +56,7 @@ func makeGenerateHandler(client *AsposeClient) mcp.ToolHandlerFor[GenerateBarcod
 
 		// Text location
 		if input.TextLocation != "" {
-			loc, err := mapCodeLocation(input.TextLocation)
+			loc, err := MapCodeLocation(input.TextLocation)
 			if err != nil {
 				return nil, err
 			}
@@ -96,17 +100,18 @@ func makeGenerateHandler(client *AsposeClient) mcp.ToolHandlerFor[GenerateBarcod
 		if imageFormat == barcode.BarcodeImageFormatSvg {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
-					&mcp.TextContent{Text: string(imageBytes)},
+					mcp.TextContent{Type: "text", Text: string(imageBytes)},
 				},
 			}, nil
 		}
 
-		mimeType := mimeTypeForFormat(imageFormat)
+		mimeType := MimeTypeForFormat(imageFormat)
 		encoded := base64.StdEncoding.EncodeToString(imageBytes)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				&mcp.ImageContent{
-					Data:     []byte(encoded),
+				mcp.ImageContent{
+					Type:     "image",
+					Data:     encoded,
 					MIMEType: mimeType,
 				},
 			},
@@ -114,8 +119,8 @@ func makeGenerateHandler(client *AsposeClient) mcp.ToolHandlerFor[GenerateBarcod
 	}
 }
 
-// mapImageFormat maps a user-provided format string to the SDK enum.
-func mapImageFormat(s string) (barcode.BarcodeImageFormat, error) {
+// MapImageFormat maps a user-provided format string to the SDK enum.
+func MapImageFormat(s string) (barcode.BarcodeImageFormat, error) {
 	switch strings.ToUpper(s) {
 	case "PNG":
 		return barcode.BarcodeImageFormatPng, nil
@@ -132,8 +137,8 @@ func mapImageFormat(s string) (barcode.BarcodeImageFormat, error) {
 	}
 }
 
-// mapCodeLocation maps a user-provided text location to the SDK enum.
-func mapCodeLocation(s string) (barcode.CodeLocation, error) {
+// MapCodeLocation maps a user-provided text location to the SDK enum.
+func MapCodeLocation(s string) (barcode.CodeLocation, error) {
 	switch strings.ToLower(s) {
 	case "below":
 		return barcode.CodeLocationBelow, nil
@@ -146,8 +151,8 @@ func mapCodeLocation(s string) (barcode.CodeLocation, error) {
 	}
 }
 
-// mimeTypeForFormat returns the MIME type for a given barcode image format.
-func mimeTypeForFormat(f barcode.BarcodeImageFormat) string {
+// MimeTypeForFormat returns the MIME type for a given barcode image format.
+func MimeTypeForFormat(f barcode.BarcodeImageFormat) string {
 	switch f {
 	case barcode.BarcodeImageFormatPng:
 		return "image/png"

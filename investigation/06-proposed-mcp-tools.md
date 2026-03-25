@@ -93,7 +93,7 @@ The API has 3 groups of operations. Each maps naturally to MCP tools.
 
 ## Authentication Flow
 
-1. Server reads `ASPOSE_CLIENT_ID` and `ASPOSE_CLIENT_SECRET` from environment
+1. Server reads `ASPOSE_CLOUD_CLIENT_ID` and `ASPOSE_CLOUD_CLIENT_SECRET` from environment
 2. On startup, creates JWT config using the SDK
 3. Creates auth context used for all API calls
 4. Token refresh is handled automatically by the SDK

@@ -66,10 +66,10 @@ config:
     https://dashboard.aspose.cloud/applications
   secrets:
     - name: aspose-barcode.client_id
-      env: ASPOSE_CLIENT_ID
+      env: ASPOSE_CLOUD_CLIENT_ID
       example: your-client-id-from-aspose-dashboard
     - name: aspose-barcode.client_secret
-      env: ASPOSE_CLIENT_SECRET
+      env: ASPOSE_CLOUD_CLIENT_SECRET
       example: your-client-secret-from-aspose-dashboard
 ```
 

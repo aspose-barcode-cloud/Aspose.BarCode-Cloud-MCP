@@ -53,7 +53,7 @@ type AsposeClient struct {
 // Returns error if credentials are empty.
 func NewAsposeClient(clientID, clientSecret string) (*AsposeClient, error) {
     if clientID == "" || clientSecret == "" {
-        return nil, fmt.Errorf("ASPOSE_CLIENT_ID and ASPOSE_CLIENT_SECRET must be set")
+        return nil, fmt.Errorf("ASPOSE_CLOUD_CLIENT_ID and ASPOSE_CLOUD_CLIENT_SECRET must be set")
     }
 
     // Create JWT config for OAuth 2.0 token acquisition

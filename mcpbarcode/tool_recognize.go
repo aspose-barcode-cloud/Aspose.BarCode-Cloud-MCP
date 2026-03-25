@@ -1,4 +1,4 @@
-package main
+package mcpbarcode
 
 import (
 	"context"
@@ -6,21 +6,25 @@ import (
 	"strings"
 
 	"github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // RecognizeBarcodeInput defines the input parameters for the recognize_barcode tool.
 type RecognizeBarcodeInput struct {
-	ImageData            string `json:"image_data"                         jsonschema:"Base64-encoded image data (PNG, JPEG, GIF, TIFF, or BMP)"`
-	BarcodeType          string `json:"barcode_type,omitempty"             jsonschema:"Barcode type to look for (e.g. QR, Code128). Default: most commonly used types"`
-	RecognitionMode      string `json:"recognition_mode,omitempty"         jsonschema:"Recognition quality vs speed trade-off: Fast, Normal, or Excellent"`
-	RecognitionImageKind string `json:"recognition_image_kind,omitempty"   jsonschema:"Hint about the image source for better recognition: Photo, ScannedDocument, or ClearImage"`
+	ImageData            string `json:"image_data"                         jsonschema:"description=Base64-encoded image data (PNG, JPEG, GIF, TIFF, or BMP)"`
+	BarcodeType          string `json:"barcode_type,omitempty"             jsonschema:"description=Barcode type to look for (e.g. QR, Code128). Default: most commonly used types"`
+	RecognitionMode      string `json:"recognition_mode,omitempty"         jsonschema:"description=Recognition quality vs speed trade-off: Fast, Normal, or Excellent"`
+	RecognitionImageKind string `json:"recognition_image_kind,omitempty"   jsonschema:"description=Hint about the image source for better recognition: Photo, ScannedDocument, or ClearImage"`
 }
 
-// makeRecognizeHandler creates the handler for the recognize_barcode tool.
-func makeRecognizeHandler(client *AsposeClient) mcp.ToolHandlerFor[RecognizeBarcodeInput, any] {
-	return func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[RecognizeBarcodeInput]) (*mcp.CallToolResult, error) {
-		input := params.Arguments
+// MakeRecognizeHandler creates the handler for the recognize_barcode tool.
+func MakeRecognizeHandler(client *AsposeClient) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var input RecognizeBarcodeInput
+		if err := request.BindArguments(&input); err != nil {
+			return nil, fmt.Errorf("invalid arguments: %w", err)
+		}
 
 		// Build barcode types list
 		barcodeTypes := []barcode.DecodeBarcodeType{barcode.DecodeBarcodeTypeMostCommonlyUsed}
@@ -33,7 +37,7 @@ func makeRecognizeHandler(client *AsposeClient) mcp.ToolHandlerFor[RecognizeBarc
 				if p == "" {
 					continue
 				}
-				dt, err := mapDecodeType(p)
+				dt, err := MapDecodeType(p)
 				if err != nil {
 					return nil, err
 				}
@@ -48,7 +52,7 @@ func makeRecognizeHandler(client *AsposeClient) mcp.ToolHandlerFor[RecognizeBarc
 
 		// Map optional recognition mode
 		if input.RecognitionMode != "" {
-			mode, err := mapRecognitionMode(input.RecognitionMode)
+			mode, err := MapRecognitionMode(input.RecognitionMode)
 			if err != nil {
 				return nil, err
 			}
@@ -57,7 +61,7 @@ func makeRecognizeHandler(client *AsposeClient) mcp.ToolHandlerFor[RecognizeBarc
 
 		// Map optional recognition image kind
 		if input.RecognitionImageKind != "" {
-			kind, err := mapRecognitionImageKind(input.RecognitionImageKind)
+			kind, err := MapRecognitionImageKind(input.RecognitionImageKind)
 			if err != nil {
 				return nil, err
 			}
@@ -69,17 +73,17 @@ func makeRecognizeHandler(client *AsposeClient) mcp.ToolHandlerFor[RecognizeBarc
 			return nil, fmt.Errorf("Aspose API error: %w", err)
 		}
 
-		text := formatBarcodeResults(result)
+		text := FormatBarcodeResults(result)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				&mcp.TextContent{Text: text},
+				mcp.TextContent{Type: "text", Text: text},
 			},
 		}, nil
 	}
 }
 
-// mapRecognitionMode maps a user-provided mode string to the SDK enum.
-func mapRecognitionMode(s string) (barcode.RecognitionMode, error) {
+// MapRecognitionMode maps a user-provided mode string to the SDK enum.
+func MapRecognitionMode(s string) (barcode.RecognitionMode, error) {
 	switch strings.ToLower(s) {
 	case "fast":
 		return barcode.RecognitionModeFast, nil
@@ -92,8 +96,8 @@ func mapRecognitionMode(s string) (barcode.RecognitionMode, error) {
 	}
 }
 
-// mapRecognitionImageKind maps a user-provided kind string to the SDK enum.
-func mapRecognitionImageKind(s string) (barcode.RecognitionImageKind, error) {
+// MapRecognitionImageKind maps a user-provided kind string to the SDK enum.
+func MapRecognitionImageKind(s string) (barcode.RecognitionImageKind, error) {
 	switch strings.ToLower(s) {
 	case "photo":
 		return barcode.RecognitionImageKindPhoto, nil

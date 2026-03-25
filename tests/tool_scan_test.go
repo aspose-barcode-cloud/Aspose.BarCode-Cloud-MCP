@@ -1,14 +1,16 @@
-package main
+package tests
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
+
+	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
 )
 
 func TestFormatBarcodeResults_NoBarcodes(t *testing.T) {
-	result := formatBarcodeResults(barcode.BarcodeResponseList{
+	result := mcpbarcode.FormatBarcodeResults(barcode.BarcodeResponseList{
 		Barcodes: []barcode.BarcodeResponse{},
 	})
 
@@ -19,7 +21,7 @@ func TestFormatBarcodeResults_NoBarcodes(t *testing.T) {
 }
 
 func TestFormatBarcodeResults_NilBarcodes(t *testing.T) {
-	result := formatBarcodeResults(barcode.BarcodeResponseList{
+	result := mcpbarcode.FormatBarcodeResults(barcode.BarcodeResponseList{
 		Barcodes: nil,
 	})
 
@@ -30,7 +32,7 @@ func TestFormatBarcodeResults_NilBarcodes(t *testing.T) {
 }
 
 func TestFormatBarcodeResults_SingleBarcode(t *testing.T) {
-	result := formatBarcodeResults(barcode.BarcodeResponseList{
+	result := mcpbarcode.FormatBarcodeResults(barcode.BarcodeResponseList{
 		Barcodes: []barcode.BarcodeResponse{
 			{
 				Type:         "QR",
@@ -51,7 +53,7 @@ func TestFormatBarcodeResults_SingleBarcode(t *testing.T) {
 }
 
 func TestFormatBarcodeResults_MultipleBarcodes(t *testing.T) {
-	result := formatBarcodeResults(barcode.BarcodeResponseList{
+	result := mcpbarcode.FormatBarcodeResults(barcode.BarcodeResponseList{
 		Barcodes: []barcode.BarcodeResponse{
 			{
 				Type:         "QR",
@@ -80,7 +82,7 @@ func TestFormatBarcodeResults_MultipleBarcodes(t *testing.T) {
 }
 
 func TestFormatBarcodeResults_WithChecksum(t *testing.T) {
-	result := formatBarcodeResults(barcode.BarcodeResponseList{
+	result := mcpbarcode.FormatBarcodeResults(barcode.BarcodeResponseList{
 		Barcodes: []barcode.BarcodeResponse{
 			{
 				Type:         "EAN13",
@@ -96,7 +98,7 @@ func TestFormatBarcodeResults_WithChecksum(t *testing.T) {
 }
 
 func TestFormatBarcodeResults_WithoutChecksum(t *testing.T) {
-	result := formatBarcodeResults(barcode.BarcodeResponseList{
+	result := mcpbarcode.FormatBarcodeResults(barcode.BarcodeResponseList{
 		Barcodes: []barcode.BarcodeResponse{
 			{
 				Type:         "QR",

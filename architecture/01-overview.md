@@ -14,8 +14,8 @@ The **Aspose Barcode MCP Server** is a Go application that bridges MCP-compatibl
                                                          │                                            │
                                                          │ reads env vars                             │ OAuth 2.0 JWT
                                                          ▼                                            ▼
-                                                  ASPOSE_CLIENT_ID                         https://id.aspose.cloud
-                                                  ASPOSE_CLIENT_SECRET                     /connect/token
+                                                  ASPOSE_CLOUD_CLIENT_ID                         https://id.aspose.cloud
+                                                  ASPOSE_CLOUD_CLIENT_SECRET                     /connect/token
 ```
 
 ## Key Design Decisions (from investigation)

@@ -24,7 +24,7 @@ aspose-barcode-mcp/                 # root of the MCP server source (separate re
 ## File Responsibilities
 
 ### main.go
-- Read and validate `ASPOSE_CLIENT_ID` and `ASPOSE_CLIENT_SECRET` from environment
+- Read and validate `ASPOSE_CLOUD_CLIENT_ID` and `ASPOSE_CLOUD_CLIENT_SECRET` from environment
 - Create `AsposeClient` instance
 - Create MCP server via `mcp.NewServer(&mcp.Implementation{...}, nil)`
 - Register all 4 tools with `mcp.AddTool(s, &mcp.Tool{...}, handler)`

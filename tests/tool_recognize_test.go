@@ -1,9 +1,11 @@
-package main
+package tests
 
 import (
 	"testing"
 
 	"github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
+
+	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
 )
 
 func TestMapRecognitionMode_ValidModes(t *testing.T) {
@@ -22,12 +24,12 @@ func TestMapRecognitionMode_ValidModes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result, err := mapRecognitionMode(tt.input)
+			result, err := mcpbarcode.MapRecognitionMode(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error for %q: %v", tt.input, err)
 			}
 			if result != tt.expected {
-				t.Errorf("mapRecognitionMode(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("MapRecognitionMode(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -37,7 +39,7 @@ func TestMapRecognitionMode_InvalidMode(t *testing.T) {
 	invalidModes := []string{"SuperFast", "", "invalid", "Quick"}
 	for _, m := range invalidModes {
 		t.Run(m, func(t *testing.T) {
-			_, err := mapRecognitionMode(m)
+			_, err := mcpbarcode.MapRecognitionMode(m)
 			if err == nil {
 				t.Fatalf("expected error for mode %q, got nil", m)
 			}
@@ -60,12 +62,12 @@ func TestMapRecognitionImageKind_ValidKinds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result, err := mapRecognitionImageKind(tt.input)
+			result, err := mcpbarcode.MapRecognitionImageKind(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error for %q: %v", tt.input, err)
 			}
 			if result != tt.expected {
-				t.Errorf("mapRecognitionImageKind(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("MapRecognitionImageKind(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -75,7 +77,7 @@ func TestMapRecognitionImageKind_InvalidKind(t *testing.T) {
 	invalidKinds := []string{"Blurry", "", "invalid", "HighRes"}
 	for _, k := range invalidKinds {
 		t.Run(k, func(t *testing.T) {
-			_, err := mapRecognitionImageKind(k)
+			_, err := mcpbarcode.MapRecognitionImageKind(k)
 			if err == nil {
 				t.Fatalf("expected error for kind %q, got nil", k)
 			}

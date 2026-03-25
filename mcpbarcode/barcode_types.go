@@ -1,4 +1,4 @@
-package main
+package mcpbarcode
 
 import (
 	"fmt"
@@ -194,16 +194,16 @@ func init() {
 	}
 }
 
-// mapEncodeType performs case-insensitive lookup of an EncodeBarcodeType.
-func mapEncodeType(s string) (barcode.EncodeBarcodeType, error) {
+// MapEncodeType performs case-insensitive lookup of an EncodeBarcodeType.
+func MapEncodeType(s string) (barcode.EncodeBarcodeType, error) {
 	if t, ok := encodeTypeMap[strings.ToLower(s)]; ok {
 		return t, nil
 	}
 	return "", fmt.Errorf("unsupported barcode type for generation: %q", s)
 }
 
-// mapDecodeType performs case-insensitive lookup of a DecodeBarcodeType.
-func mapDecodeType(s string) (barcode.DecodeBarcodeType, error) {
+// MapDecodeType performs case-insensitive lookup of a DecodeBarcodeType.
+func MapDecodeType(s string) (barcode.DecodeBarcodeType, error) {
 	if t, ok := decodeTypeMap[strings.ToLower(s)]; ok {
 		return t, nil
 	}

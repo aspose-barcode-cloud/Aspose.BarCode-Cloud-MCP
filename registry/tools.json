@@ -6,7 +6,7 @@
       {
         "name": "barcode_type",
         "type": "string",
-        "desc": "Barcode symbology (e.g., QR, Code128, DataMatrix, EAN13, PDF417)",
+        "desc": "Barcode symbology (e.g. QR or Code128 or DataMatrix or EAN13 or PDF417 etc.). Use list_barcode_types for all existing values. Only one value should be passed.",
         "required": true
       },
       {
@@ -18,45 +18,45 @@
       {
         "name": "image_format",
         "type": "string",
-        "desc": "Output format: PNG (default), JPEG, SVG, GIF, TIFF"
+        "desc": "Output format: PNG (default) or JPEG or SVG or GIF or TIFF."
       },
       {
         "name": "text_location",
         "type": "string",
-        "desc": "Text position: Below, Above, None. Default depends on barcode type"
+        "desc": "Text position: Below or Above or None. Default depends on barcode type"
       }
     ]
   },
   {
     "name": "recognize_barcode",
-    "description": "Recognize barcodes of a specific type from a base64-encoded image. Allows specifying barcode types and recognition quality.",
+    "description": "Recognize barcodes of a specific type(s) from a base64-encoded image bytes. Allows specifying barcode types and recognition quality. For one-shot recognition, base64-encode the image bytes and call recognize_barcode with image_data set to the raw base64 string. Use barcode_type=QR for QR-only",
     "arguments": [
       {
         "name": "image_data",
         "type": "string",
-        "desc": "Base64-encoded image data",
+        "desc": "Base64-encoded image bytes",
         "required": true
       },
       {
         "name": "barcode_type",
         "type": "string",
-        "desc": "Types to look for (e.g., QR, Code128). Default: most commonly used types"
+        "desc": "Types to look for (e.g. QR, Code128). Use list_barcode_types for all existing values. Default: most commonly used types. For many types checking use comma-separated values."
       },
       {
         "name": "recognition_mode",
         "type": "string",
-        "desc": "Quality vs speed: Fast, Normal (default), Excellent"
+        "desc": "Quality vs speed: Fast or Normal (default) or Excellent"
       }
     ]
   },
   {
     "name": "scan_barcode",
-    "description": "Automatically detect and read most common barcodes in a base64-encoded image without specifying barcode type.",
+    "description": "Automatically detect and read most common barcodes in a base64-encoded image without specifying barcode type.  For one-shot recognition, base64-encode the image bytes and call scan_barcode with image_data set to the raw base64 string.",
     "arguments": [
       {
         "name": "image_data",
         "type": "string",
-        "desc": "Base64-encoded image data",
+        "desc": "Base64-encoded image bytes",
         "required": true
       }
     ]

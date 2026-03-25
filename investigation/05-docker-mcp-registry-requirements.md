@@ -51,10 +51,10 @@ config:
   description: Configure Aspose Cloud API credentials
   secrets:                               # sensitive values (user must provide)
     - name: aspose-barcode.client_id
-      env: ASPOSE_CLIENT_ID
+      env: ASPOSE_CLOUD_CLIENT_ID
       example: <YOUR_CLIENT_ID>
     - name: aspose-barcode.client_secret
-      env: ASPOSE_CLIENT_SECRET
+      env: ASPOSE_CLOUD_CLIENT_SECRET
       example: <YOUR_CLIENT_SECRET>
 ```
 

@@ -1,4 +1,4 @@
-package main
+package tests
 
 import (
 	"context"
@@ -7,17 +7,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+
+	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
 )
 
 func skipWithoutCredentials(t *testing.T) {
 	t.Helper()
-	if os.Getenv("ASPOSE_CLIENT_ID") == "" || os.Getenv("ASPOSE_CLIENT_SECRET") == "" {
-		t.Skip("ASPOSE_CLIENT_ID and ASPOSE_CLIENT_SECRET not set")
+	if os.Getenv("ASPOSE_CLOUD_CLIENT_ID") == "" || os.Getenv("ASPOSE_CLOUD_CLIENT_SECRET") == "" {
+		t.Skip("ASPOSE_CLOUD_CLIENT_ID and ASPOSE_CLOUD_CLIENT_SECRET not set")
 	}
 }
 
-func registerIntegrationTools(t *testing.T, s *mcp.Server, client *AsposeClient) (ok bool) {
+func registerIntegrationTools(t *testing.T, s *server.MCPServer, asposeClient *mcpbarcode.AsposeClient) (ok bool) {
 	t.Helper()
 	defer func() {
 		if r := recover(); r != nil {
@@ -26,67 +30,68 @@ func registerIntegrationTools(t *testing.T, s *mcp.Server, client *AsposeClient)
 		}
 	}()
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "generate_barcode",
-		Description: "Generate a barcode image",
-	}, makeGenerateHandler(client))
+	s.AddTool(mcp.NewTool("generate_barcode",
+		mcp.WithDescription("Generate a barcode image"),
+		mcp.WithInputSchema[mcpbarcode.GenerateBarcodeInput](),
+	), mcpbarcode.MakeGenerateHandler(asposeClient))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "recognize_barcode",
-		Description: "Recognize barcodes from an image",
-	}, makeRecognizeHandler(client))
+	s.AddTool(mcp.NewTool("recognize_barcode",
+		mcp.WithDescription("Recognize barcodes from an image"),
+		mcp.WithInputSchema[mcpbarcode.RecognizeBarcodeInput](),
+	), mcpbarcode.MakeRecognizeHandler(asposeClient))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "scan_barcode",
-		Description: "Scan barcodes from an image",
-	}, makeScanHandler(client))
+	s.AddTool(mcp.NewTool("scan_barcode",
+		mcp.WithDescription("Scan barcodes from an image"),
+		mcp.WithInputSchema[mcpbarcode.ScanBarcodeInput](),
+	), mcpbarcode.MakeScanHandler(asposeClient))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_barcode_types",
-		Description: "List supported barcode types",
-	}, makeListHandler())
+	s.AddTool(mcp.NewTool("list_barcode_types",
+		mcp.WithDescription("List supported barcode types"),
+		mcp.WithInputSchema[mcpbarcode.ListBarcodeTypesInput](),
+	), mcpbarcode.MakeListHandler())
 
 	return true
 }
 
-func createIntegrationServer(t *testing.T) *mcp.ClientSession {
+func createIntegrationServer(t *testing.T) *client.Client {
 	t.Helper()
 	skipWithoutCredentials(t)
 
-	client, err := NewAsposeClient(
-		os.Getenv("ASPOSE_CLIENT_ID"),
-		os.Getenv("ASPOSE_CLIENT_SECRET"),
+	asposeClient, err := mcpbarcode.NewAsposeClient(
+		os.Getenv("ASPOSE_CLOUD_CLIENT_ID"),
+		os.Getenv("ASPOSE_CLOUD_CLIENT_SECRET"),
 	)
 	if err != nil {
 		t.Fatalf("failed to create Aspose client: %v", err)
 	}
 
-	s := mcp.NewServer(
-		&mcp.Implementation{Name: "aspose-barcode-cloud", Version: "test"},
-		nil,
-	)
+	s := server.NewMCPServer("aspose-barcode-cloud", "test")
 
-	if !registerIntegrationTools(t, s, client) {
+	if !registerIntegrationTools(t, s, asposeClient) {
 		return nil
 	}
 
 	ctx := context.Background()
-	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 
-	serverSession, err := s.Connect(ctx, serverTransport)
+	c, err := client.NewInProcessClient(s)
 	if err != nil {
-		t.Fatalf("server connect error: %v", err)
+		t.Fatalf("failed to create in-process client: %v", err)
 	}
-	t.Cleanup(func() { serverSession.Wait() })
 
-	mcpClient := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1.0"}, nil)
-	clientSession, err := mcpClient.Connect(ctx, clientTransport)
-	if err != nil {
-		t.Fatalf("client connect error: %v", err)
+	if err := c.Start(ctx); err != nil {
+		t.Fatalf("failed to start client: %v", err)
 	}
-	t.Cleanup(func() { clientSession.Close() })
 
-	return clientSession
+	initReq := mcp.InitializeRequest{}
+	initReq.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+	initReq.Params.ClientInfo = mcp.Implementation{Name: "test-client", Version: "1.0"}
+
+	if _, err := c.Initialize(ctx, initReq); err != nil {
+		t.Fatalf("failed to initialize client: %v", err)
+	}
+
+	t.Cleanup(func() { c.Close() })
+	return c
 }
 
 // TestIntegration_GenerateAndScanRoundTrip generates a QR barcode and then
@@ -98,11 +103,13 @@ func TestIntegration_GenerateAndScanRoundTrip(t *testing.T) {
 	testData := "Hello from integration test"
 
 	// Step 1: Generate a QR barcode
-	genResult, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "generate_barcode",
-		Arguments: map[string]any{
-			"barcode_type": "QR",
-			"data":         testData,
+	genResult, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "generate_barcode",
+			Arguments: map[string]any{
+				"barcode_type": "QR",
+				"data":         testData,
+			},
 		},
 	})
 	if err != nil {
@@ -116,7 +123,7 @@ func TestIntegration_GenerateAndScanRoundTrip(t *testing.T) {
 	if len(genResult.Content) != 1 {
 		t.Fatalf("expected 1 content block, got %d", len(genResult.Content))
 	}
-	imgContent, ok := genResult.Content[0].(*mcp.ImageContent)
+	imgContent, ok := genResult.Content[0].(mcp.ImageContent)
 	if !ok {
 		t.Fatalf("expected ImageContent, got %T", genResult.Content[0])
 	}
@@ -125,10 +132,12 @@ func TestIntegration_GenerateAndScanRoundTrip(t *testing.T) {
 	}
 
 	// Step 2: Scan the generated barcode
-	scanResult, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "scan_barcode",
-		Arguments: map[string]any{
-			"image_data": string(imgContent.Data),
+	scanResult, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "scan_barcode",
+			Arguments: map[string]any{
+				"image_data": imgContent.Data,
+			},
 		},
 	})
 	if err != nil {
@@ -138,7 +147,7 @@ func TestIntegration_GenerateAndScanRoundTrip(t *testing.T) {
 		t.Fatalf("scan_barcode returned error: %v", scanResult.Content)
 	}
 
-	textContent, ok := scanResult.Content[0].(*mcp.TextContent)
+	textContent, ok := scanResult.Content[0].(mcp.TextContent)
 	if !ok {
 		t.Fatalf("expected TextContent, got %T", scanResult.Content[0])
 	}
@@ -157,11 +166,13 @@ func TestIntegration_GenerateAndRecognizeRoundTrip(t *testing.T) {
 	testData := "TEST12345"
 
 	// Step 1: Generate a Code128 barcode
-	genResult, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "generate_barcode",
-		Arguments: map[string]any{
-			"barcode_type": "Code128",
-			"data":         testData,
+	genResult, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "generate_barcode",
+			Arguments: map[string]any{
+				"barcode_type": "Code128",
+				"data":         testData,
+			},
 		},
 	})
 	if err != nil {
@@ -171,14 +182,16 @@ func TestIntegration_GenerateAndRecognizeRoundTrip(t *testing.T) {
 		t.Fatalf("generate_barcode returned error: %v", genResult.Content)
 	}
 
-	imgContent := genResult.Content[0].(*mcp.ImageContent)
+	imgContent := genResult.Content[0].(mcp.ImageContent)
 
 	// Step 2: Recognize with type hint
-	recResult, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "recognize_barcode",
-		Arguments: map[string]any{
-			"image_data":   string(imgContent.Data),
-			"barcode_type": "Code128",
+	recResult, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "recognize_barcode",
+			Arguments: map[string]any{
+				"image_data":   imgContent.Data,
+				"barcode_type": "Code128",
+			},
 		},
 	})
 	if err != nil {
@@ -188,7 +201,7 @@ func TestIntegration_GenerateAndRecognizeRoundTrip(t *testing.T) {
 		t.Fatalf("recognize_barcode returned error: %v", recResult.Content)
 	}
 
-	textContent := recResult.Content[0].(*mcp.TextContent)
+	textContent := recResult.Content[0].(mcp.TextContent)
 	if !strings.Contains(textContent.Text, testData) {
 		t.Errorf("recognize result does not contain original data %q, got: %s", testData, textContent.Text)
 	}
@@ -202,13 +215,15 @@ func TestIntegration_GenerateWithOptions(t *testing.T) {
 	cs := createIntegrationServer(t)
 	ctx := context.Background()
 
-	result, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "generate_barcode",
-		Arguments: map[string]any{
-			"barcode_type":  "QR",
-			"data":          "Options test",
-			"image_format":  "JPEG",
-			"text_location": "None",
+	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "generate_barcode",
+			Arguments: map[string]any{
+				"barcode_type":  "QR",
+				"data":          "Options test",
+				"image_format":  "JPEG",
+				"text_location": "None",
+			},
 		},
 	})
 	if err != nil {
@@ -218,7 +233,7 @@ func TestIntegration_GenerateWithOptions(t *testing.T) {
 		t.Fatalf("generate_barcode returned error: %v", result.Content)
 	}
 
-	imgContent := result.Content[0].(*mcp.ImageContent)
+	imgContent := result.Content[0].(mcp.ImageContent)
 	if imgContent.MIMEType != "image/jpeg" {
 		t.Errorf("expected MIME type image/jpeg, got %q", imgContent.MIMEType)
 	}
@@ -229,12 +244,14 @@ func TestIntegration_GenerateSVG(t *testing.T) {
 	cs := createIntegrationServer(t)
 	ctx := context.Background()
 
-	result, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "generate_barcode",
-		Arguments: map[string]any{
-			"barcode_type": "QR",
-			"data":         "SVG test",
-			"image_format": "SVG",
+	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "generate_barcode",
+			Arguments: map[string]any{
+				"barcode_type": "QR",
+				"data":         "SVG test",
+				"image_format": "SVG",
+			},
 		},
 	})
 	if err != nil {
@@ -244,7 +261,7 @@ func TestIntegration_GenerateSVG(t *testing.T) {
 		t.Fatalf("generate_barcode returned error: %v", result.Content)
 	}
 
-	textContent, ok := result.Content[0].(*mcp.TextContent)
+	textContent, ok := result.Content[0].(mcp.TextContent)
 	if !ok {
 		t.Fatalf("SVG should return TextContent, got %T", result.Content[0])
 	}
@@ -262,10 +279,12 @@ func TestIntegration_ScanBlankImage(t *testing.T) {
 	blankPNG := createMinimalWhitePNG()
 	b64 := base64.StdEncoding.EncodeToString(blankPNG)
 
-	result, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "scan_barcode",
-		Arguments: map[string]any{
-			"image_data": b64,
+	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "scan_barcode",
+			Arguments: map[string]any{
+				"image_data": b64,
+			},
 		},
 	})
 	if err != nil {
@@ -275,7 +294,7 @@ func TestIntegration_ScanBlankImage(t *testing.T) {
 		t.Fatalf("scan_barcode returned error: %v", result.Content)
 	}
 
-	textContent := result.Content[0].(*mcp.TextContent)
+	textContent := result.Content[0].(mcp.TextContent)
 	if !strings.Contains(textContent.Text, "No barcodes detected") {
 		t.Errorf("expected 'No barcodes detected', got: %s", textContent.Text)
 	}
@@ -286,19 +305,18 @@ func TestIntegration_InvalidBarcodeType(t *testing.T) {
 	cs := createIntegrationServer(t)
 	ctx := context.Background()
 
-	result, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "generate_barcode",
-		Arguments: map[string]any{
-			"barcode_type": "COMPLETELY_FAKE_TYPE",
-			"data":         "test",
+	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "generate_barcode",
+			Arguments: map[string]any{
+				"barcode_type": "COMPLETELY_FAKE_TYPE",
+				"data":         "test",
+			},
 		},
 	})
-	if err != nil {
-		t.Fatalf("expected error result, got protocol error: %v", err)
-	}
-
-	if !result.IsError {
-		t.Fatal("expected error result for invalid barcode type")
+	// mcp-go returns handler errors as protocol errors
+	if err == nil && !result.IsError {
+		t.Fatal("expected error for invalid barcode type")
 	}
 }
 
@@ -310,26 +328,30 @@ func TestIntegration_RecognizeWithMode(t *testing.T) {
 	testData := "ModeTest123"
 
 	// Generate
-	genResult, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "generate_barcode",
-		Arguments: map[string]any{
-			"barcode_type": "QR",
-			"data":         testData,
+	genResult, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "generate_barcode",
+			Arguments: map[string]any{
+				"barcode_type": "QR",
+				"data":         testData,
+			},
 		},
 	})
 	if err != nil {
 		t.Fatalf("generate error: %v", err)
 	}
-	imgContent := genResult.Content[0].(*mcp.ImageContent)
+	imgContent := genResult.Content[0].(mcp.ImageContent)
 
 	// Recognize with Excellent mode
-	result, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name: "recognize_barcode",
-		Arguments: map[string]any{
-			"image_data":            string(imgContent.Data),
-			"barcode_type":          "QR",
-			"recognition_mode":      "Excellent",
-			"recognition_image_kind": "ClearImage",
+	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "recognize_barcode",
+			Arguments: map[string]any{
+				"image_data":             imgContent.Data,
+				"barcode_type":           "QR",
+				"recognition_mode":       "Excellent",
+				"recognition_image_kind": "ClearImage",
+			},
 		},
 	})
 	if err != nil {
@@ -339,7 +361,7 @@ func TestIntegration_RecognizeWithMode(t *testing.T) {
 		t.Fatalf("recognize returned error: %v", result.Content)
 	}
 
-	textContent := result.Content[0].(*mcp.TextContent)
+	textContent := result.Content[0].(mcp.TextContent)
 	if !strings.Contains(textContent.Text, testData) {
 		t.Errorf("expected data %q in result, got: %s", testData, textContent.Text)
 	}

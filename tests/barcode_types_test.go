@@ -1,9 +1,11 @@
-package main
+package tests
 
 import (
 	"testing"
 
 	"github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
+
+	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
 )
 
 func TestMapEncodeType_ValidTypes(t *testing.T) {
@@ -26,26 +28,26 @@ func TestMapEncodeType_ValidTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result, err := mapEncodeType(tt.input)
+			result, err := mcpbarcode.MapEncodeType(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error for %q: %v", tt.input, err)
 			}
 			if result != tt.expected {
-				t.Errorf("mapEncodeType(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("MapEncodeType(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
 }
 
 func TestMapEncodeType_InvalidType(t *testing.T) {
-	_, err := mapEncodeType("NonExistentType")
+	_, err := mcpbarcode.MapEncodeType("NonExistentType")
 	if err == nil {
 		t.Fatal("expected error for invalid barcode type, got nil")
 	}
 }
 
 func TestMapEncodeType_EmptyString(t *testing.T) {
-	_, err := mapEncodeType("")
+	_, err := mcpbarcode.MapEncodeType("")
 	if err == nil {
 		t.Fatal("expected error for empty string, got nil")
 	}
@@ -68,39 +70,39 @@ func TestMapDecodeType_ValidTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result, err := mapDecodeType(tt.input)
+			result, err := mcpbarcode.MapDecodeType(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error for %q: %v", tt.input, err)
 			}
 			if result != tt.expected {
-				t.Errorf("mapDecodeType(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("MapDecodeType(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
 }
 
 func TestMapDecodeType_InvalidType(t *testing.T) {
-	_, err := mapDecodeType("NonExistentType")
+	_, err := mcpbarcode.MapDecodeType("NonExistentType")
 	if err == nil {
 		t.Fatal("expected error for invalid barcode type, got nil")
 	}
 }
 
 func TestSupportedEncodeTypes_NotEmpty(t *testing.T) {
-	if len(SupportedEncodeTypes) == 0 {
+	if len(mcpbarcode.SupportedEncodeTypes) == 0 {
 		t.Fatal("SupportedEncodeTypes should not be empty")
 	}
 }
 
 func TestSupportedDecodeTypes_NotEmpty(t *testing.T) {
-	if len(SupportedDecodeTypes) == 0 {
+	if len(mcpbarcode.SupportedDecodeTypes) == 0 {
 		t.Fatal("SupportedDecodeTypes should not be empty")
 	}
 }
 
 func TestAllEncodeTypesAreMappable(t *testing.T) {
-	for _, et := range SupportedEncodeTypes {
-		_, err := mapEncodeType(string(et))
+	for _, et := range mcpbarcode.SupportedEncodeTypes {
+		_, err := mcpbarcode.MapEncodeType(string(et))
 		if err != nil {
 			t.Errorf("SupportedEncodeType %q is not mappable: %v", et, err)
 		}
@@ -108,8 +110,8 @@ func TestAllEncodeTypesAreMappable(t *testing.T) {
 }
 
 func TestAllDecodeTypesAreMappable(t *testing.T) {
-	for _, dt := range SupportedDecodeTypes {
-		_, err := mapDecodeType(string(dt))
+	for _, dt := range mcpbarcode.SupportedDecodeTypes {
+		_, err := mcpbarcode.MapDecodeType(string(dt))
 		if err != nil {
 			t.Errorf("SupportedDecodeType %q is not mappable: %v", dt, err)
 		}

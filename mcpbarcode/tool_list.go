@@ -1,19 +1,20 @@
-package main
+package mcpbarcode
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // ListBarcodeTypesInput is empty — the tool takes no parameters.
 type ListBarcodeTypesInput struct{}
 
-// makeListHandler creates the handler for the list_barcode_types tool.
-func makeListHandler() mcp.ToolHandlerFor[ListBarcodeTypesInput, any] {
-	return func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ListBarcodeTypesInput]) (*mcp.CallToolResult, error) {
+// MakeListHandler creates the handler for the list_barcode_types tool.
+func MakeListHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var sb strings.Builder
 
 		sb.WriteString("Supported barcode types for GENERATION:\n")
@@ -28,7 +29,7 @@ func makeListHandler() mcp.ToolHandlerFor[ListBarcodeTypesInput, any] {
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				&mcp.TextContent{Text: sb.String()},
+				mcp.TextContent{Type: "text", Text: sb.String()},
 			},
 		}, nil
 	}

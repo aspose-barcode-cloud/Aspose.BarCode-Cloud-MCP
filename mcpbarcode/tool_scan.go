@@ -1,4 +1,4 @@
-package main
+package mcpbarcode
 
 import (
 	"context"
@@ -6,18 +6,22 @@ import (
 	"strings"
 
 	"github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // ScanBarcodeInput defines the input parameters for the scan_barcode tool.
 type ScanBarcodeInput struct {
-	ImageData string `json:"image_data" jsonschema:"Base64-encoded image data (PNG, JPEG, GIF, TIFF, or BMP)"`
+	ImageData string `json:"image_data" jsonschema:"description=Base64-encoded image data (PNG, JPEG, GIF, TIFF, or BMP)"`
 }
 
-// makeScanHandler creates the handler for the scan_barcode tool.
-func makeScanHandler(client *AsposeClient) mcp.ToolHandlerFor[ScanBarcodeInput, any] {
-	return func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ScanBarcodeInput]) (*mcp.CallToolResult, error) {
-		input := params.Arguments
+// MakeScanHandler creates the handler for the scan_barcode tool.
+func MakeScanHandler(client *AsposeClient) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var input ScanBarcodeInput
+		if err := request.BindArguments(&input); err != nil {
+			return nil, fmt.Errorf("invalid arguments: %w", err)
+		}
 
 		body := barcode.ScanBase64Request{
 			FileBase64: input.ImageData,
@@ -28,17 +32,17 @@ func makeScanHandler(client *AsposeClient) mcp.ToolHandlerFor[ScanBarcodeInput, 
 			return nil, fmt.Errorf("Aspose API error: %w", err)
 		}
 
-		text := formatBarcodeResults(result)
+		text := FormatBarcodeResults(result)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				&mcp.TextContent{Text: text},
+				mcp.TextContent{Type: "text", Text: text},
 			},
 		}, nil
 	}
 }
 
-// formatBarcodeResults formats a BarcodeResponseList into human-readable text.
-func formatBarcodeResults(result barcode.BarcodeResponseList) string {
+// FormatBarcodeResults formats a BarcodeResponseList into human-readable text.
+func FormatBarcodeResults(result barcode.BarcodeResponseList) string {
 	if len(result.Barcodes) == 0 {
 		return "No barcodes detected in the image."
 	}

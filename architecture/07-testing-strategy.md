@@ -27,15 +27,15 @@ Test tool handlers with a mocked Aspose client.
 - Empty scan results → "No barcodes detected" message
 - Base64 decode failure → clear error message
 
-### 2. Integration Tests (require ASPOSE_CLIENT_ID + ASPOSE_CLIENT_SECRET)
+### 2. Integration Tests (require ASPOSE_CLOUD_CLIENT_ID + ASPOSE_CLOUD_CLIENT_SECRET)
 
 **File**: `integration_test.go`
 
 **Guard**: Skip if credentials are not set:
 ```go
 func skipWithoutCredentials(t *testing.T) {
-    if os.Getenv("ASPOSE_CLIENT_ID") == "" || os.Getenv("ASPOSE_CLIENT_SECRET") == "" {
-        t.Skip("ASPOSE_CLIENT_ID and ASPOSE_CLIENT_SECRET not set")
+    if os.Getenv("ASPOSE_CLOUD_CLIENT_ID") == "" || os.Getenv("ASPOSE_CLOUD_CLIENT_SECRET") == "" {
+        t.Skip("ASPOSE_CLOUD_CLIENT_ID and ASPOSE_CLOUD_CLIENT_SECRET not set")
     }
 }
 ```
@@ -59,8 +59,8 @@ docker run --rm aspose-barcode-cloud-mcp 2>&1 | head -5
 # Full test with credentials
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' \
   | docker run --rm -i \
-    -e ASPOSE_CLIENT_ID=$ASPOSE_CLIENT_ID \
-    -e ASPOSE_CLIENT_SECRET=$ASPOSE_CLIENT_SECRET \
+    -e ASPOSE_CLOUD_CLIENT_ID=$ASPOSE_CLOUD_CLIENT_ID \
+    -e ASPOSE_CLOUD_CLIENT_SECRET=$ASPOSE_CLOUD_CLIENT_SECRET \
     aspose-barcode-cloud-mcp
 ```
 
@@ -85,7 +85,7 @@ Verify the full JSON-RPC lifecycle via stdio:
 go test ./... -short
 
 # Integration tests (with credentials)
-ASPOSE_CLIENT_ID=xxx ASPOSE_CLIENT_SECRET=yyy go test ./... -v
+ASPOSE_CLOUD_CLIENT_ID=xxx ASPOSE_CLOUD_CLIENT_SECRET=yyy go test ./... -v
 
 # Lint
 go vet ./...

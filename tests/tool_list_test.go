@@ -1,21 +1,22 @@
-package main
+package tests
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mark3labs/mcp-go/mcp"
+
+	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
 )
 
 func TestMakeListHandler_ReturnsResult(t *testing.T) {
-	handler := makeListHandler()
+	handler := mcpbarcode.MakeListHandler()
 
-	params := &mcp.CallToolParamsFor[ListBarcodeTypesInput]{
-		Arguments: ListBarcodeTypesInput{},
-	}
+	request := mcp.CallToolRequest{}
+	request.Params.Name = "list_barcode_types"
 
-	result, err := handler(context.Background(), nil, params)
+	result, err := handler(context.Background(), request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -26,7 +27,7 @@ func TestMakeListHandler_ReturnsResult(t *testing.T) {
 		t.Fatalf("expected 1 content block, got %d", len(result.Content))
 	}
 
-	textContent, ok := result.Content[0].(*mcp.TextContent)
+	textContent, ok := result.Content[0].(mcp.TextContent)
 	if !ok {
 		t.Fatalf("expected TextContent, got %T", result.Content[0])
 	}
@@ -53,20 +54,19 @@ func TestMakeListHandler_ReturnsResult(t *testing.T) {
 }
 
 func TestMakeListHandler_ContainsAllEncodeTypes(t *testing.T) {
-	handler := makeListHandler()
+	handler := mcpbarcode.MakeListHandler()
 
-	params := &mcp.CallToolParamsFor[ListBarcodeTypesInput]{
-		Arguments: ListBarcodeTypesInput{},
-	}
+	request := mcp.CallToolRequest{}
+	request.Params.Name = "list_barcode_types"
 
-	result, err := handler(context.Background(), nil, params)
+	result, err := handler(context.Background(), request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	text := result.Content[0].(*mcp.TextContent).Text
+	text := result.Content[0].(mcp.TextContent).Text
 
-	for _, et := range SupportedEncodeTypes {
+	for _, et := range mcpbarcode.SupportedEncodeTypes {
 		if !strings.Contains(text, string(et)) {
 			t.Errorf("encode type %q not found in list output", et)
 		}
@@ -74,20 +74,19 @@ func TestMakeListHandler_ContainsAllEncodeTypes(t *testing.T) {
 }
 
 func TestMakeListHandler_ContainsAllDecodeTypes(t *testing.T) {
-	handler := makeListHandler()
+	handler := mcpbarcode.MakeListHandler()
 
-	params := &mcp.CallToolParamsFor[ListBarcodeTypesInput]{
-		Arguments: ListBarcodeTypesInput{},
-	}
+	request := mcp.CallToolRequest{}
+	request.Params.Name = "list_barcode_types"
 
-	result, err := handler(context.Background(), nil, params)
+	result, err := handler(context.Background(), request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	text := result.Content[0].(*mcp.TextContent).Text
+	text := result.Content[0].(mcp.TextContent).Text
 
-	for _, dt := range SupportedDecodeTypes {
+	for _, dt := range mcpbarcode.SupportedDecodeTypes {
 		if !strings.Contains(text, string(dt)) {
 			t.Errorf("decode type %q not found in list output", dt)
 		}
