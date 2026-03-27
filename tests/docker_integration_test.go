@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +22,18 @@ var (
 	buildOnce  sync.Once
 	buildError error
 )
+
+func isDockerPermissionError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "access is denied") ||
+		strings.Contains(message, "permission denied") ||
+		strings.Contains(message, "error loading config file") ||
+		strings.Contains(message, ".docker\\buildx\\instances")
+}
 
 // jsonRPCRequest creates a JSON-RPC 2.0 request.
 func jsonRPCRequest(id int, method string, params any) []byte {
@@ -62,10 +75,11 @@ type jsonRPCResponse struct {
 
 // dockerMCPSession manages a Docker container running the MCP server.
 type dockerMCPSession struct {
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	stdout *bufio.Reader
-	stderr bytes.Buffer
+	cmd      *exec.Cmd
+	stdin    io.WriteCloser
+	stdout   *bufio.Reader
+	stderr   bytes.Buffer
+	mountDir string // host-side mount directory
 }
 
 func ensureDockerBuild(t *testing.T) {
@@ -88,6 +102,9 @@ func ensureDockerBuild(t *testing.T) {
 	})
 
 	if buildError != nil {
+		if isDockerPermissionError(buildError) {
+			t.Skipf("docker is unavailable in this environment: %v", buildError)
+		}
 		t.Fatalf("docker build: %v", buildError)
 	}
 }
@@ -99,19 +116,30 @@ func skipDockerWithoutCredentials(t *testing.T) {
 	}
 }
 
-// startDockerMCP starts the MCP server in a Docker container with credentials.
+func dockerCredential(envVar string) string {
+	if value := os.Getenv(envVar); value != "" {
+		return value
+	}
+	return "test"
+}
+
+// startDockerMCP starts the MCP server in a Docker container with credentials and mount.
 func startDockerMCP(t *testing.T) *dockerMCPSession {
 	t.Helper()
 
+	mountDir := t.TempDir()
+
 	args := []string{
 		"run", "--rm", "-i",
-		"-e", "ASPOSE_CLOUD_CLIENT_ID=" + os.Getenv("ASPOSE_CLOUD_CLIENT_ID"),
-		"-e", "ASPOSE_CLOUD_CLIENT_SECRET=" + os.Getenv("ASPOSE_CLOUD_CLIENT_SECRET"),
+		"-e", "ASPOSE_CLOUD_CLIENT_ID=" + dockerCredential("ASPOSE_CLOUD_CLIENT_ID"),
+		"-e", "ASPOSE_CLOUD_CLIENT_SECRET=" + dockerCredential("ASPOSE_CLOUD_CLIENT_SECRET"),
+		"-e", "ASPOSE_CLOUD_MOUNT_PATH=/mnt/data",
+		"-v", mountDir + ":/mnt/data",
 		dockerImage,
 	}
 
 	cmd := exec.Command("docker", args...)
-	s := &dockerMCPSession{cmd: cmd}
+	s := &dockerMCPSession{cmd: cmd, mountDir: mountDir}
 
 	var err error
 	s.stdin, err = cmd.StdinPipe()
@@ -212,7 +240,9 @@ func TestDocker_FailsWithoutCredentials(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "run", "--rm", dockerImage)
+	cmd := exec.CommandContext(ctx, "docker", "run", "--rm",
+		"-e", "ASPOSE_CLOUD_MOUNT_PATH=/mnt/data",
+		dockerImage)
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected non-zero exit without credentials")
@@ -224,9 +254,29 @@ func TestDocker_FailsWithoutCredentials(t *testing.T) {
 	}
 }
 
+func TestDocker_FailsWithoutMountPath(t *testing.T) {
+	ensureDockerBuild(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "docker", "run", "--rm",
+		"-e", "ASPOSE_CLOUD_CLIENT_ID=test",
+		"-e", "ASPOSE_CLOUD_CLIENT_SECRET=test",
+		dockerImage)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit without mount path")
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "ASPOSE_CLOUD_MOUNT_PATH") {
+		t.Errorf("expected mount path error message, got: %s", out)
+	}
+}
+
 func TestDocker_Initialize(t *testing.T) {
 	ensureDockerBuild(t)
-	skipDockerWithoutCredentials(t)
 
 	s := startDockerMCP(t)
 	resp := s.initialize(t)
@@ -250,7 +300,6 @@ func TestDocker_Initialize(t *testing.T) {
 
 func TestDocker_ListTools(t *testing.T) {
 	ensureDockerBuild(t)
-	skipDockerWithoutCredentials(t)
 
 	s := startDockerMCP(t)
 	s.initialize(t)
@@ -293,7 +342,6 @@ func TestDocker_ListTools(t *testing.T) {
 
 func TestDocker_ListBarcodeTypes(t *testing.T) {
 	ensureDockerBuild(t)
-	skipDockerWithoutCredentials(t)
 
 	s := startDockerMCP(t)
 	s.initialize(t)
@@ -355,9 +403,8 @@ func TestDocker_GenerateAndScanRoundTrip(t *testing.T) {
 
 	var genResult struct {
 		Content []struct {
-			Type     string `json:"type"`
-			Data     string `json:"data"`
-			MimeType string `json:"mimeType"`
+			Type string `json:"type"`
+			Text string `json:"text"`
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(genResp.Result, &genResult); err != nil {
@@ -367,20 +414,28 @@ func TestDocker_GenerateAndScanRoundTrip(t *testing.T) {
 	if len(genResult.Content) == 0 {
 		t.Fatal("expected content in generate response")
 	}
-	if genResult.Content[0].Type != "image" {
-		t.Fatalf("expected image content, got %q", genResult.Content[0].Type)
+	if genResult.Content[0].Type != "text" {
+		t.Fatalf("expected text content, got %q", genResult.Content[0].Type)
 	}
-	if genResult.Content[0].MimeType != "image/png" {
-		t.Errorf("expected image/png, got %q", genResult.Content[0].MimeType)
+	if !strings.Contains(genResult.Content[0].Text, "image/png") {
+		t.Errorf("expected image/png in response, got: %s", genResult.Content[0].Text)
 	}
 
-	imageData := genResult.Content[0].Data
+	// Extract filename from response
+	line := strings.SplitN(genResult.Content[0].Text, "\n", 2)[0]
+	filename := strings.TrimPrefix(line, "Generated barcode image saved to: ")
 
-	// Scan the generated barcode
+	// Verify file exists on host mount
+	hostFile := filepath.Join(s.mountDir, filename)
+	if _, err := os.Stat(hostFile); err != nil {
+		t.Fatalf("generated file not found on host: %v", err)
+	}
+
+	// Scan the generated barcode via file path
 	s.sendRequest(t, jsonRPCRequest(3, "tools/call", map[string]any{
 		"name": "scan_barcode",
 		"arguments": map[string]any{
-			"image_data": imageData,
+			"image_path": filename,
 		},
 	}))
 	scanResp := s.readResponse(t, 60*time.Second)
@@ -433,20 +488,22 @@ func TestDocker_GenerateAndRecognizeRoundTrip(t *testing.T) {
 	var genResult struct {
 		Content []struct {
 			Type string `json:"type"`
-			Data string `json:"data"`
+			Text string `json:"text"`
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(genResp.Result, &genResult); err != nil {
 		t.Fatalf("unmarshal generate: %v", err)
 	}
 
-	imageData := genResult.Content[0].Data
+	// Extract filename
+	line := strings.SplitN(genResult.Content[0].Text, "\n", 2)[0]
+	filename := strings.TrimPrefix(line, "Generated barcode image saved to: ")
 
 	// Recognize with type hint
 	s.sendRequest(t, jsonRPCRequest(3, "tools/call", map[string]any{
 		"name": "recognize_barcode",
 		"arguments": map[string]any{
-			"image_data":   imageData,
+			"image_path":   filename,
 			"barcode_type": "Code128",
 		},
 	}))
@@ -514,14 +571,56 @@ func TestDocker_GenerateSVG(t *testing.T) {
 	if result.Content[0].Type != "text" {
 		t.Fatalf("SVG should return text content, got %q", result.Content[0].Type)
 	}
-	if !strings.Contains(result.Content[0].Text, "<svg") && !strings.Contains(result.Content[0].Text, "<?xml") {
-		t.Errorf("expected SVG content, got: %.100s...", result.Content[0].Text)
+	if !strings.Contains(result.Content[0].Text, "image/svg+xml") {
+		t.Errorf("expected image/svg+xml in response, got: %s", result.Content[0].Text)
+	}
+
+	// Extract filename and verify SVG file on host
+	line := strings.SplitN(result.Content[0].Text, "\n", 2)[0]
+	filename := strings.TrimPrefix(line, "Generated barcode image saved to: ")
+	hostFile := filepath.Join(s.mountDir, filename)
+	data, err := os.ReadFile(hostFile)
+	if err != nil {
+		t.Fatalf("SVG file not found on host: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "<svg") && !strings.Contains(content, "<?xml") {
+		t.Errorf("expected SVG content, got: %.100s...", content)
+	}
+}
+
+func TestDocker_PathTraversalBlocked(t *testing.T) {
+	ensureDockerBuild(t)
+
+	s := startDockerMCP(t)
+	s.initialize(t)
+
+	s.sendRequest(t, jsonRPCRequest(2, "tools/call", map[string]any{
+		"name": "scan_barcode",
+		"arguments": map[string]any{
+			"image_path": "../etc/passwd.png",
+		},
+	}))
+	resp := s.readResponse(t, 30*time.Second)
+
+	// Should get an error either as JSON-RPC error or as isError in result
+	if resp.Error != nil {
+		return // JSON-RPC level error — fine
+	}
+
+	var result struct {
+		IsError bool `json:"isError"`
+	}
+	if err := json.Unmarshal(resp.Result, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !result.IsError {
+		t.Error("expected error for path traversal")
 	}
 }
 
 func TestDocker_InvalidBarcodeType(t *testing.T) {
 	ensureDockerBuild(t)
-	skipDockerWithoutCredentials(t)
 
 	s := startDockerMCP(t)
 	s.initialize(t)

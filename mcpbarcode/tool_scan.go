@@ -12,22 +12,31 @@ import (
 
 // ScanBarcodeInput defines the input parameters for the scan_barcode tool.
 type ScanBarcodeInput struct {
-	ImageData string `json:"image_data" jsonschema:"description=Base64-encoded image data (PNG, JPEG, GIF, TIFF, or BMP)"`
+	ImagePath string `json:"image_path" jsonschema:"description=Path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP)"`
 }
 
 // MakeScanHandler creates the handler for the scan_barcode tool.
-func MakeScanHandler(client *AsposeClient) server.ToolHandlerFunc {
+func MakeScanHandler(client *AsposeClient, mount *MountConfig) server.ToolHandlerFunc {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input ScanBarcodeInput
 		if err := request.BindArguments(&input); err != nil {
 			return nil, fmt.Errorf("invalid arguments: %w", err)
 		}
 
-		body := barcode.ScanBase64Request{
-			FileBase64: input.ImageData,
+		if input.ImagePath == "" {
+			return nil, fmt.Errorf("'image_path' is required")
+		}
+		if err := ValidateImageExtension(input.ImagePath); err != nil {
+			return nil, err
 		}
 
-		result, _, err := client.API.ScanAPI.ScanBase64(client.AuthCtx, body)
+		file, err := mount.OpenFile(input.ImagePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open image: %w", err)
+		}
+		defer file.Close()
+
+		result, _, err := client.API.ScanAPI.ScanMultipart(client.AuthCtx, file)
 		if err != nil {
 			return nil, fmt.Errorf("Aspose API error: %w", err)
 		}

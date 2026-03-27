@@ -29,30 +29,38 @@ func main() {
 		log.Fatalf("Failed to create Aspose client: %v", err)
 	}
 
+	// Read mount path configuration (required)
+	mountPath := os.Getenv("ASPOSE_CLOUD_MOUNT_PATH")
+	mount, err := mcpbarcode.NewMountConfig(mountPath)
+	if err != nil {
+		log.Fatalf("Mount configuration error: %v", err)
+	}
+	log.Printf("Mount mode enabled: %s", mount.Path)
+
 	// Create MCP server
 	s := server.NewMCPServer("aspose-barcode-cloud", serverVersion)
 
 	// Register tools
 	s.AddTool(mcp.NewTool("generate_barcode",
 		mcp.WithDescription("Generate a barcode image of the specified type encoding the given data. "+
-			"Returns the image as base64-encoded content. "+
+			"Saves the image file to the mounted data directory and returns the file path. "+
 			"Use list_barcode_types to see all supported barcode types."),
 		mcp.WithInputSchema[mcpbarcode.GenerateBarcodeInput](),
-	), mcpbarcode.MakeGenerateHandler(client))
+	), mcpbarcode.MakeGenerateHandler(client, mount))
 
 	s.AddTool(mcp.NewTool("recognize_barcode",
-		mcp.WithDescription("Recognize barcodes of a specific type from a base64-encoded image. "+
+		mcp.WithDescription("Recognize barcodes of a specific type from an image file in the mounted data directory. "+
 			"Allows specifying the barcode type and recognition quality. "+
-			"For automatic detection of most commonly used barcode types, use scan_barcode instead or set MostCommonlyUsed barcode type."),
+			"For automatic detection of most commonly used barcode types, use scan_barcode instead."),
 		mcp.WithInputSchema[mcpbarcode.RecognizeBarcodeInput](),
-	), mcpbarcode.MakeRecognizeHandler(client))
+	), mcpbarcode.MakeRecognizeHandler(client, mount))
 
 	s.AddTool(mcp.NewTool("scan_barcode",
-		mcp.WithDescription("Automatically detect and read commonly used barcodes in a base64-encoded image. "+
-			"Scans for most commonly used supported barcode types without requiring you to specify which type. "+
+		mcp.WithDescription("Automatically detect and read commonly used barcodes from an image file "+
+			"in the mounted data directory. "+
 			"For targeted recognition of a specific barcode type, use recognize_barcode instead."),
 		mcp.WithInputSchema[mcpbarcode.ScanBarcodeInput](),
-	), mcpbarcode.MakeScanHandler(client))
+	), mcpbarcode.MakeScanHandler(client, mount))
 
 	s.AddTool(mcp.NewTool("list_barcode_types",
 		mcp.WithDescription("List all supported barcode types for generation and recognition. "+

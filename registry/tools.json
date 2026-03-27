@@ -1,7 +1,7 @@
 [
   {
     "name": "generate_barcode",
-    "description": "Generate a barcode image of the specified type encoding the given data. Returns the image as base64-encoded content.",
+    "description": "Generate a barcode image of the specified type encoding the given data. Saves the image file to the mounted data directory and returns the file path.",
     "arguments": [
       {
         "name": "barcode_type",
@@ -29,18 +29,18 @@
   },
   {
     "name": "recognize_barcode",
-    "description": "Recognize barcodes of a specific type(s) from a base64-encoded image bytes. Allows specifying barcode types and recognition quality. For one-shot recognition, base64-encode the image bytes and call recognize_barcode with image_data set to the raw base64 string. Use barcode_type=QR for QR-only",
+    "description": "Recognize barcodes of a specific type from an image file in the mounted data directory. Allows specifying barcode type and recognition quality. Use barcode_type=QR for QR-only.",
     "arguments": [
       {
-        "name": "image_data",
+        "name": "image_path",
         "type": "string",
-        "desc": "Base64-encoded image bytes",
+        "desc": "Path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP)",
         "required": true
       },
       {
         "name": "barcode_type",
         "type": "string",
-        "desc": "Types to look for (e.g. QR, Code128). Use list_barcode_types for all existing values. Default: most commonly used types. For many types checking use comma-separated values."
+        "desc": "Types to look for (e.g. QR or Code128). Use list_barcode_types for all existing values. Default: most commonly used types."
       },
       {
         "name": "recognition_mode",
@@ -51,12 +51,12 @@
   },
   {
     "name": "scan_barcode",
-    "description": "Automatically detect and read most common barcodes in a base64-encoded image without specifying barcode type.  For one-shot recognition, base64-encode the image bytes and call scan_barcode with image_data set to the raw base64 string.",
+    "description": "Automatically detect and read most common barcodes from an image file in the mounted data directory without specifying barcode type.",
     "arguments": [
       {
-        "name": "image_data",
+        "name": "image_path",
         "type": "string",
-        "desc": "Base64-encoded image bytes",
+        "desc": "Path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP)",
         "required": true
       }
     ]

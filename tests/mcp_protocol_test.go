@@ -40,21 +40,25 @@ func createFullServer(t *testing.T) (s *server.MCPServer) {
 	s = server.NewMCPServer("aspose-barcode-cloud", "test")
 
 	dummyClient := &mcpbarcode.AsposeClient{}
+	mount, err := mcpbarcode.NewMountConfig(t.TempDir())
+	if err != nil {
+		t.Fatalf("failed to create mount config: %v", err)
+	}
 
 	s.AddTool(mcp.NewTool("generate_barcode",
 		mcp.WithDescription("Generate a barcode image"),
 		mcp.WithInputSchema[mcpbarcode.GenerateBarcodeInput](),
-	), mcpbarcode.MakeGenerateHandler(dummyClient))
+	), mcpbarcode.MakeGenerateHandler(dummyClient, mount))
 
 	s.AddTool(mcp.NewTool("recognize_barcode",
 		mcp.WithDescription("Recognize barcodes from an image"),
 		mcp.WithInputSchema[mcpbarcode.RecognizeBarcodeInput](),
-	), mcpbarcode.MakeRecognizeHandler(dummyClient))
+	), mcpbarcode.MakeRecognizeHandler(dummyClient, mount))
 
 	s.AddTool(mcp.NewTool("scan_barcode",
 		mcp.WithDescription("Scan barcodes from an image"),
 		mcp.WithInputSchema[mcpbarcode.ScanBarcodeInput](),
-	), mcpbarcode.MakeScanHandler(dummyClient))
+	), mcpbarcode.MakeScanHandler(dummyClient, mount))
 
 	s.AddTool(mcp.NewTool("list_barcode_types",
 		mcp.WithDescription("List supported barcode types"),

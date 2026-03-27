@@ -2,16 +2,24 @@ package tests
 
 import (
 	"context"
-	"encoding/base64"
+	"net"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
+)
+
+var (
+	asposeConnectivityOnce sync.Once
+	asposeConnectivityErr  error
 )
 
 func skipWithoutCredentials(t *testing.T) {
@@ -21,7 +29,24 @@ func skipWithoutCredentials(t *testing.T) {
 	}
 }
 
-func registerIntegrationTools(t *testing.T, s *server.MCPServer, asposeClient *mcpbarcode.AsposeClient) (ok bool) {
+func skipWithoutAsposeConnectivity(t *testing.T) {
+	t.Helper()
+
+	asposeConnectivityOnce.Do(func() {
+		conn, err := net.DialTimeout("tcp", "id.aspose.cloud:443", 5*time.Second)
+		if err != nil {
+			asposeConnectivityErr = err
+			return
+		}
+		_ = conn.Close()
+	})
+
+	if asposeConnectivityErr != nil {
+		t.Skipf("Aspose Cloud is unreachable from this environment: %v", asposeConnectivityErr)
+	}
+}
+
+func registerIntegrationTools(t *testing.T, s *server.MCPServer, asposeClient *mcpbarcode.AsposeClient, mount *mcpbarcode.MountConfig) (ok bool) {
 	t.Helper()
 	defer func() {
 		if r := recover(); r != nil {
@@ -33,17 +58,17 @@ func registerIntegrationTools(t *testing.T, s *server.MCPServer, asposeClient *m
 	s.AddTool(mcp.NewTool("generate_barcode",
 		mcp.WithDescription("Generate a barcode image"),
 		mcp.WithInputSchema[mcpbarcode.GenerateBarcodeInput](),
-	), mcpbarcode.MakeGenerateHandler(asposeClient))
+	), mcpbarcode.MakeGenerateHandler(asposeClient, mount))
 
 	s.AddTool(mcp.NewTool("recognize_barcode",
 		mcp.WithDescription("Recognize barcodes from an image"),
 		mcp.WithInputSchema[mcpbarcode.RecognizeBarcodeInput](),
-	), mcpbarcode.MakeRecognizeHandler(asposeClient))
+	), mcpbarcode.MakeRecognizeHandler(asposeClient, mount))
 
 	s.AddTool(mcp.NewTool("scan_barcode",
 		mcp.WithDescription("Scan barcodes from an image"),
 		mcp.WithInputSchema[mcpbarcode.ScanBarcodeInput](),
-	), mcpbarcode.MakeScanHandler(asposeClient))
+	), mcpbarcode.MakeScanHandler(asposeClient, mount))
 
 	s.AddTool(mcp.NewTool("list_barcode_types",
 		mcp.WithDescription("List supported barcode types"),
@@ -53,9 +78,12 @@ func registerIntegrationTools(t *testing.T, s *server.MCPServer, asposeClient *m
 	return true
 }
 
-func createIntegrationServer(t *testing.T) *client.Client {
+// createIntegrationServer creates an in-process MCP client with a mount-enabled server.
+// Returns the client and the mount directory path.
+func createIntegrationServer(t *testing.T) (*client.Client, string) {
 	t.Helper()
 	skipWithoutCredentials(t)
+	skipWithoutAsposeConnectivity(t)
 
 	asposeClient, err := mcpbarcode.NewAsposeClient(
 		os.Getenv("ASPOSE_CLOUD_CLIENT_ID"),
@@ -65,10 +93,16 @@ func createIntegrationServer(t *testing.T) *client.Client {
 		t.Fatalf("failed to create Aspose client: %v", err)
 	}
 
+	mountDir := t.TempDir()
+	mount, err := mcpbarcode.NewMountConfig(mountDir)
+	if err != nil {
+		t.Fatalf("failed to create mount config: %v", err)
+	}
+
 	s := server.NewMCPServer("aspose-barcode-cloud", "test")
 
-	if !registerIntegrationTools(t, s, asposeClient) {
-		return nil
+	if !registerIntegrationTools(t, s, asposeClient, mount) {
+		return nil, ""
 	}
 
 	ctx := context.Background()
@@ -91,13 +125,32 @@ func createIntegrationServer(t *testing.T) *client.Client {
 	}
 
 	t.Cleanup(func() { c.Close() })
-	return c
+	return c, mountDir
+}
+
+// extractFilenameFromResponse parses the filename from a generate_barcode TextContent response.
+func extractFilenameFromResponse(t *testing.T, result *mcp.CallToolResult) string {
+	t.Helper()
+	if len(result.Content) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(result.Content))
+	}
+	textContent, ok := result.Content[0].(mcp.TextContent)
+	if !ok {
+		t.Fatalf("expected TextContent, got %T", result.Content[0])
+	}
+	// Format: "Generated barcode image saved to: <filename>\nFormat: <mime>"
+	line := strings.SplitN(textContent.Text, "\n", 2)[0]
+	prefix := "Generated barcode image saved to: "
+	if !strings.HasPrefix(line, prefix) {
+		t.Fatalf("unexpected response format: %s", textContent.Text)
+	}
+	return strings.TrimPrefix(line, prefix)
 }
 
 // TestIntegration_GenerateAndScanRoundTrip generates a QR barcode and then
 // scans it to verify the decoded value matches the input.
 func TestIntegration_GenerateAndScanRoundTrip(t *testing.T) {
-	cs := createIntegrationServer(t)
+	cs, mountDir := createIntegrationServer(t)
 	ctx := context.Background()
 
 	testData := "Hello from integration test"
@@ -119,24 +172,34 @@ func TestIntegration_GenerateAndScanRoundTrip(t *testing.T) {
 		t.Fatalf("generate_barcode returned error: %v", genResult.Content)
 	}
 
-	// Verify we got image content
-	if len(genResult.Content) != 1 {
-		t.Fatalf("expected 1 content block, got %d", len(genResult.Content))
-	}
-	imgContent, ok := genResult.Content[0].(mcp.ImageContent)
-	if !ok {
-		t.Fatalf("expected ImageContent, got %T", genResult.Content[0])
-	}
-	if imgContent.MIMEType != "image/png" {
-		t.Errorf("expected MIME type image/png, got %q", imgContent.MIMEType)
+	// Verify we got text content with a file path
+	filename := extractFilenameFromResponse(t, genResult)
+	if !strings.HasSuffix(filename, ".png") {
+		t.Errorf("expected .png suffix, got: %s", filename)
 	}
 
-	// Step 2: Scan the generated barcode
+	// Verify file exists on disk
+	filePath := filepath.Join(mountDir, filename)
+	info, err := os.Stat(filePath)
+	if err != nil {
+		t.Fatalf("generated file not found: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("generated file is empty")
+	}
+
+	// Verify response contains format metadata
+	textContent := genResult.Content[0].(mcp.TextContent)
+	if !strings.Contains(textContent.Text, "image/png") {
+		t.Errorf("expected image/png in response, got: %s", textContent.Text)
+	}
+
+	// Step 2: Scan the generated barcode via file path
 	scanResult, err := cs.CallTool(ctx, mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "scan_barcode",
 			Arguments: map[string]any{
-				"image_data": imgContent.Data,
+				"image_path": filename,
 			},
 		},
 	})
@@ -147,20 +210,16 @@ func TestIntegration_GenerateAndScanRoundTrip(t *testing.T) {
 		t.Fatalf("scan_barcode returned error: %v", scanResult.Content)
 	}
 
-	textContent, ok := scanResult.Content[0].(mcp.TextContent)
-	if !ok {
-		t.Fatalf("expected TextContent, got %T", scanResult.Content[0])
-	}
-
-	if !strings.Contains(textContent.Text, testData) {
-		t.Errorf("scan result does not contain original data %q, got: %s", testData, textContent.Text)
+	scanText := scanResult.Content[0].(mcp.TextContent)
+	if !strings.Contains(scanText.Text, testData) {
+		t.Errorf("scan result does not contain original data %q, got: %s", testData, scanText.Text)
 	}
 }
 
 // TestIntegration_GenerateAndRecognizeRoundTrip generates a Code128 barcode
 // and recognizes it with a type hint.
 func TestIntegration_GenerateAndRecognizeRoundTrip(t *testing.T) {
-	cs := createIntegrationServer(t)
+	cs, _ := createIntegrationServer(t)
 	ctx := context.Background()
 
 	testData := "TEST12345"
@@ -182,14 +241,14 @@ func TestIntegration_GenerateAndRecognizeRoundTrip(t *testing.T) {
 		t.Fatalf("generate_barcode returned error: %v", genResult.Content)
 	}
 
-	imgContent := genResult.Content[0].(mcp.ImageContent)
+	filename := extractFilenameFromResponse(t, genResult)
 
 	// Step 2: Recognize with type hint
 	recResult, err := cs.CallTool(ctx, mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "recognize_barcode",
 			Arguments: map[string]any{
-				"image_data":   imgContent.Data,
+				"image_path":   filename,
 				"barcode_type": "Code128",
 			},
 		},
@@ -212,7 +271,7 @@ func TestIntegration_GenerateAndRecognizeRoundTrip(t *testing.T) {
 
 // TestIntegration_GenerateWithOptions tests generation with custom options.
 func TestIntegration_GenerateWithOptions(t *testing.T) {
-	cs := createIntegrationServer(t)
+	cs, _ := createIntegrationServer(t)
 	ctx := context.Background()
 
 	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
@@ -233,15 +292,20 @@ func TestIntegration_GenerateWithOptions(t *testing.T) {
 		t.Fatalf("generate_barcode returned error: %v", result.Content)
 	}
 
-	imgContent := result.Content[0].(mcp.ImageContent)
-	if imgContent.MIMEType != "image/jpeg" {
-		t.Errorf("expected MIME type image/jpeg, got %q", imgContent.MIMEType)
+	textContent := result.Content[0].(mcp.TextContent)
+	if !strings.Contains(textContent.Text, "image/jpeg") {
+		t.Errorf("expected image/jpeg in response, got: %s", textContent.Text)
+	}
+
+	filename := extractFilenameFromResponse(t, result)
+	if !strings.HasSuffix(filename, ".jpg") {
+		t.Errorf("expected .jpg suffix, got: %s", filename)
 	}
 }
 
-// TestIntegration_GenerateSVG tests SVG format generation returns text content.
+// TestIntegration_GenerateSVG tests SVG format generation writes to file.
 func TestIntegration_GenerateSVG(t *testing.T) {
-	cs := createIntegrationServer(t)
+	cs, mountDir := createIntegrationServer(t)
 	ctx := context.Background()
 
 	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
@@ -261,29 +325,44 @@ func TestIntegration_GenerateSVG(t *testing.T) {
 		t.Fatalf("generate_barcode returned error: %v", result.Content)
 	}
 
-	textContent, ok := result.Content[0].(mcp.TextContent)
-	if !ok {
-		t.Fatalf("SVG should return TextContent, got %T", result.Content[0])
+	textContent := result.Content[0].(mcp.TextContent)
+	if !strings.Contains(textContent.Text, "image/svg+xml") {
+		t.Errorf("expected image/svg+xml in response, got: %s", textContent.Text)
 	}
-	if !strings.Contains(textContent.Text, "<svg") && !strings.Contains(textContent.Text, "<?xml") {
-		t.Errorf("expected SVG content, got: %.100s...", textContent.Text)
+
+	filename := extractFilenameFromResponse(t, result)
+	if !strings.HasSuffix(filename, ".svg") {
+		t.Errorf("expected .svg suffix, got: %s", filename)
+	}
+
+	// Verify SVG file content
+	data, err := os.ReadFile(filepath.Join(mountDir, filename))
+	if err != nil {
+		t.Fatalf("failed to read SVG file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "<svg") && !strings.Contains(content, "<?xml") {
+		t.Errorf("expected SVG content, got: %.100s...", content)
 	}
 }
 
 // TestIntegration_ScanBlankImage tests scanning an image with no barcodes.
 func TestIntegration_ScanBlankImage(t *testing.T) {
-	cs := createIntegrationServer(t)
+	cs, mountDir := createIntegrationServer(t)
 	ctx := context.Background()
 
-	// Create a minimal 1x1 white PNG (base64)
+	// Write a minimal 1x1 white PNG to the mount directory
 	blankPNG := createMinimalWhitePNG()
-	b64 := base64.StdEncoding.EncodeToString(blankPNG)
+	blankFile := "blank.png"
+	if err := os.WriteFile(filepath.Join(mountDir, blankFile), blankPNG, 0644); err != nil {
+		t.Fatalf("failed to write blank PNG: %v", err)
+	}
 
 	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "scan_barcode",
 			Arguments: map[string]any{
-				"image_data": b64,
+				"image_path": blankFile,
 			},
 		},
 	})
@@ -302,7 +381,7 @@ func TestIntegration_ScanBlankImage(t *testing.T) {
 
 // TestIntegration_InvalidBarcodeType tests error handling for invalid barcode types.
 func TestIntegration_InvalidBarcodeType(t *testing.T) {
-	cs := createIntegrationServer(t)
+	cs, _ := createIntegrationServer(t)
 	ctx := context.Background()
 
 	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
@@ -322,7 +401,7 @@ func TestIntegration_InvalidBarcodeType(t *testing.T) {
 
 // TestIntegration_RecognizeWithMode tests recognition with quality mode.
 func TestIntegration_RecognizeWithMode(t *testing.T) {
-	cs := createIntegrationServer(t)
+	cs, _ := createIntegrationServer(t)
 	ctx := context.Background()
 
 	testData := "ModeTest123"
@@ -340,14 +419,14 @@ func TestIntegration_RecognizeWithMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate error: %v", err)
 	}
-	imgContent := genResult.Content[0].(mcp.ImageContent)
+	filename := extractFilenameFromResponse(t, genResult)
 
 	// Recognize with Excellent mode
 	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "recognize_barcode",
 			Arguments: map[string]any{
-				"image_data":             imgContent.Data,
+				"image_path":             filename,
 				"barcode_type":           "QR",
 				"recognition_mode":       "Excellent",
 				"recognition_image_kind": "ClearImage",
@@ -364,6 +443,60 @@ func TestIntegration_RecognizeWithMode(t *testing.T) {
 	textContent := result.Content[0].(mcp.TextContent)
 	if !strings.Contains(textContent.Text, testData) {
 		t.Errorf("expected data %q in result, got: %s", testData, textContent.Text)
+	}
+}
+
+// TestIntegration_ScanEmptyImagePath tests error for empty image_path.
+func TestIntegration_ScanEmptyImagePath(t *testing.T) {
+	cs, _ := createIntegrationServer(t)
+	ctx := context.Background()
+
+	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "scan_barcode",
+			Arguments: map[string]any{
+				"image_path": "",
+			},
+		},
+	})
+	if err == nil && !result.IsError {
+		t.Fatal("expected error for empty image_path")
+	}
+}
+
+// TestIntegration_ScanPathTraversal tests that path traversal is blocked.
+func TestIntegration_ScanPathTraversal(t *testing.T) {
+	cs, _ := createIntegrationServer(t)
+	ctx := context.Background()
+
+	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "scan_barcode",
+			Arguments: map[string]any{
+				"image_path": "../etc/passwd.png",
+			},
+		},
+	})
+	if err == nil && !result.IsError {
+		t.Fatal("expected error for path traversal")
+	}
+}
+
+// TestIntegration_ScanInvalidExtension tests that invalid file extensions are rejected.
+func TestIntegration_ScanInvalidExtension(t *testing.T) {
+	cs, _ := createIntegrationServer(t)
+	ctx := context.Background()
+
+	result, err := cs.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "scan_barcode",
+			Arguments: map[string]any{
+				"image_path": "test.txt",
+			},
+		},
+	})
+	if err == nil && !result.IsError {
+		t.Fatal("expected error for invalid extension")
 	}
 }
 

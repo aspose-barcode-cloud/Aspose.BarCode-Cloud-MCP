@@ -2,7 +2,6 @@ package mcpbarcode
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -27,7 +26,7 @@ type GenerateBarcodeInput struct {
 }
 
 // MakeGenerateHandler creates the handler for the generate_barcode tool.
-func MakeGenerateHandler(client *AsposeClient) server.ToolHandlerFunc {
+func MakeGenerateHandler(client *AsposeClient, mount *MountConfig) server.ToolHandlerFunc {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input GenerateBarcodeInput
 		if err := request.BindArguments(&input); err != nil {
@@ -96,23 +95,25 @@ func MakeGenerateHandler(client *AsposeClient) server.ToolHandlerFunc {
 			return nil, fmt.Errorf("Aspose API error: %w", err)
 		}
 
-		// Return SVG as text, raster formats as base64 image
+		// Determine file extension and MIME type
+		ext := ExtensionForFormat(input.ImageFormat)
+		mimeType := MimeTypeForFormat(imageFormat)
 		if imageFormat == barcode.BarcodeImageFormatSvg {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.TextContent{Type: "text", Text: string(imageBytes)},
-				},
-			}, nil
+			mimeType = "image/svg+xml"
 		}
 
-		mimeType := MimeTypeForFormat(imageFormat)
-		encoded := base64.StdEncoding.EncodeToString(imageBytes)
+		// Write file to mount directory
+		filename := mount.GenerateFilename(input.BarcodeType, ext)
+		relPath, err := mount.WriteFile(filename, imageBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save barcode image: %w", err)
+		}
+
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				mcp.ImageContent{
-					Type:     "image",
-					Data:     encoded,
-					MIMEType: mimeType,
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Generated barcode image saved to: %s\nFormat: %s", relPath, mimeType),
 				},
 			},
 		}, nil
