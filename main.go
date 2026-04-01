@@ -50,6 +50,7 @@ func main() {
 
 	s.AddTool(mcp.NewTool("recognize_barcode",
 		mcp.WithDescription("Recognize barcodes of a specific type from an image file in the mounted data directory. "+
+			"The image_path must be relative to the mounted directory. "+
 			"Allows specifying the barcode type and recognition quality. "+
 			"For automatic detection of most commonly used barcode types, use scan_barcode instead."),
 		mcp.WithInputSchema[mcpbarcode.RecognizeBarcodeInput](),
@@ -57,7 +58,7 @@ func main() {
 
 	s.AddTool(mcp.NewTool("scan_barcode",
 		mcp.WithDescription("Automatically detect and read commonly used barcodes from an image file "+
-			"in the mounted data directory. "+
+			"in the mounted data directory. The image_path must be relative to the mounted directory. "+
 			"For targeted recognition of a specific barcode type, use recognize_barcode instead."),
 		mcp.WithInputSchema[mcpbarcode.ScanBarcodeInput](),
 	), mcpbarcode.MakeScanHandler(client, mount))

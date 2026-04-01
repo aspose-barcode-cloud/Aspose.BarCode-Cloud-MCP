@@ -30,12 +30,13 @@ func NewMountConfig(path string) (*MountConfig, error) {
 		return nil, fmt.Errorf("mount path %q is not a directory", path)
 	}
 
-	// Verify writable by creating and removing a temp file
-	testFile := filepath.Join(path, ".mount-test")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	// Verify writable by creating and removing a unique temp file
+	f, err := os.CreateTemp(path, ".mount-test-*")
+	if err != nil {
 		return nil, fmt.Errorf("mount path %q is not writable: %w", path, err)
 	}
-	os.Remove(testFile)
+	f.Close()
+	os.Remove(f.Name())
 
 	return &MountConfig{
 		Path: filepath.Clean(path),

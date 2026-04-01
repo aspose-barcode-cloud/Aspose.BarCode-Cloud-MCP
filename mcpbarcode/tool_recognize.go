@@ -2,10 +2,11 @@ package mcpbarcode
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"strings"
 
-	"github.com/antihax/optional"
 	"github.com/aspose-barcode-cloud/aspose-barcode-cloud-go/v4/barcode"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -13,7 +14,7 @@ import (
 
 // RecognizeBarcodeInput defines the input parameters for the recognize_barcode tool.
 type RecognizeBarcodeInput struct {
-	ImagePath            string `json:"image_path"                             jsonschema:"description=Path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP)"`
+	ImagePath            string `json:"image_path"                             jsonschema:"description=Relative path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP). Must be relative to the mount root, e.g. 'photo.png' or 'subdir/photo.png'"`
 	BarcodeType          string `json:"barcode_type,omitempty"                 jsonschema:"description=Barcode type to look for (e.g. QR, Code128). Default: most commonly used types"`
 	RecognitionMode      string `json:"recognition_mode,omitempty"             jsonschema:"description=Recognition quality vs speed trade-off: Fast, Normal, or Excellent"`
 	RecognitionImageKind string `json:"recognition_image_kind,omitempty"       jsonschema:"description=Hint about the image source for better recognition: Photo, ScannedDocument, or ClearImage"`
@@ -52,40 +53,41 @@ func MakeRecognizeHandler(client *AsposeClient, mount *MountConfig) server.ToolH
 			}
 		}
 
-		// Open file from mount
+		// Read file from mount and encode to base64
 		file, err := mount.OpenFile(input.ImagePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open image: %w", err)
 		}
 		defer file.Close()
 
-		// RecognizeMultipart requires a single DecodeBarcodeType
-		recognizeType := barcode.DecodeBarcodeTypeMostCommonlyUsed
-		if len(barcodeTypes) == 1 {
-			recognizeType = barcodeTypes[0]
+		imageBytes, err := io.ReadAll(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read image: %w", err)
 		}
+		fileBase64 := base64.StdEncoding.EncodeToString(imageBytes)
 
-		opts := &barcode.RecognizeAPIRecognizeMultipartOpts{}
+		body := barcode.RecognizeBase64Request{
+			BarcodeTypes: barcodeTypes,
+			FileBase64:   fileBase64,
+		}
 		if input.RecognitionMode != "" {
 			mode, err := MapRecognitionMode(input.RecognitionMode)
 			if err != nil {
 				return nil, err
 			}
-			opts.RecognitionMode = optional.NewInterface(mode)
+			body.RecognitionMode = mode
 		}
 		if input.RecognitionImageKind != "" {
 			kind, err := MapRecognitionImageKind(input.RecognitionImageKind)
 			if err != nil {
 				return nil, err
 			}
-			opts.RecognitionImageKind = optional.NewInterface(kind)
+			body.RecognitionImageKind = kind
 		}
 
-		result, _, err := client.API.RecognizeAPI.RecognizeMultipart(
+		result, _, err := client.API.RecognizeAPI.RecognizeBase64(
 			client.AuthCtx,
-			recognizeType,
-			file,
-			opts,
+			body,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("Aspose API error: %w", err)

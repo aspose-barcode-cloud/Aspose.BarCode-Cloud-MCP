@@ -40,7 +40,7 @@
       {
         "name": "barcode_type",
         "type": "string",
-        "desc": "Types to look for (e.g. QR or Code128). Use list_barcode_types for all existing values. Default: most commonly used types."
+        "desc": "Types to look for, comma-separated (e.g. QR or Code128 or QR,Code128). Use list_barcode_types for all existing values. Default: most commonly used types."
       },
       {
         "name": "recognition_mode",
