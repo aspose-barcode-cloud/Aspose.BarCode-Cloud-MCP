@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /app
 
@@ -20,3 +20,4 @@ RUN apk --no-cache add ca-certificates
 COPY --from=builder /mcp-server /mcp-server
 
 ENTRYPOINT ["/mcp-server"]
+CMD ["--mount-path=/mnt/data"]

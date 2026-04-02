@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+
+	"github.com/aspose-barcode-cloud/Aspose.BarCode-Cloud-MCP/mcpbarcode"
 )
 
 const serverVersion = "0.2604.0"
@@ -13,60 +17,65 @@ const serverVersion = "0.2604.0"
 func main() {
 	log.SetOutput(os.Stderr)
 
+	// Parse CLI parameters
+	mountPath := flag.String("mount-path", "", "Absolute path to the data directory for file exchange (required)")
+	flag.Parse()
+
+	// Validate mount path first (required)
+	mount, err := mcpbarcode.NewMountConfig(*mountPath)
+	if err != nil {
+		log.Fatalf("Mount configuration error: %v", err)
+	}
+	log.Printf("Mount mode enabled: %s", mount.Path)
+
 	// Read credentials from environment
-	clientID := os.Getenv("ASPOSE_CLIENT_ID")
-	clientSecret := os.Getenv("ASPOSE_CLIENT_SECRET")
+	clientID := os.Getenv("ASPOSE_CLOUD_CLIENT_ID")
+	clientSecret := os.Getenv("ASPOSE_CLOUD_CLIENT_SECRET")
 	if clientID == "" || clientSecret == "" {
-		log.Fatalf("ASPOSE_CLIENT_ID and ASPOSE_CLIENT_SECRET environment variables must be set")
+		log.Fatalf("ASPOSE_CLOUD_CLIENT_ID and ASPOSE_CLOUD_CLIENT_SECRET environment variables must be set")
 	}
 
 	// Create authenticated Aspose client
-	client, err := NewAsposeClient(clientID, clientSecret)
+	client, err := mcpbarcode.NewAsposeClient(clientID, clientSecret)
 	if err != nil {
 		log.Fatalf("Failed to create Aspose client: %v", err)
 	}
 
-	log.Printf("Starting Aspose Barcode MCP Server v%s", serverVersion)
-
 	// Create MCP server
-	s := mcp.NewServer(
-		&mcp.Implementation{
-			Name:    "aspose-barcode-cloud",
-			Version: serverVersion,
-		},
-		nil,
-	)
+	s := server.NewMCPServer("aspose-barcode-cloud", serverVersion)
 
 	// Register tools
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "generate_barcode",
-		Description: "Generate a barcode image of the specified type encoding the given data. " +
-			"Returns the image as base64-encoded content. " +
-			"Use list_barcode_types to see all supported barcode types.",
-	}, makeGenerateHandler(client))
+	s.AddTool(mcp.NewTool("generate_barcode",
+		mcp.WithDescription("Generate a barcode image of the specified type encoding the given data. "+
+			"Saves the image file to the mounted data directory and returns the file path. "+
+			"Use list_barcode_types to see all supported barcode types."),
+		mcp.WithInputSchema[mcpbarcode.GenerateBarcodeInput](),
+	), mcpbarcode.MakeGenerateHandler(client, mount))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "recognize_barcode",
-		Description: "Recognize barcodes of a specific type from a base64-encoded image. " +
-			"Allows specifying the barcode type and recognition quality. " +
-			"For automatic detection of most commonly used barcode types, use scan_barcode instead or set MostCommonlyUsed barcode type.",
-	}, makeRecognizeHandler(client))
+	s.AddTool(mcp.NewTool("recognize_barcode",
+		mcp.WithDescription("Recognize barcodes of a specific type from an image file in the mounted data directory. "+
+			"The image_path must be relative to the mounted directory. "+
+			"Allows specifying the barcode type and recognition quality. "+
+			"For automatic detection of most commonly used barcode types, use scan_barcode instead."),
+		mcp.WithInputSchema[mcpbarcode.RecognizeBarcodeInput](),
+	), mcpbarcode.MakeRecognizeHandler(client, mount))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "scan_barcode",
-		Description: "Automatically detect and read commonly used barcodes in a base64-encoded image. " +
-			"Scans for most commonly used supported barcode types without requiring you to specify which type. " +
-			"For targeted recognition of a specific barcode type, use recognize_barcode instead.",
-	}, makeScanHandler(client))
+	s.AddTool(mcp.NewTool("scan_barcode",
+		mcp.WithDescription("Automatically detect and read commonly used barcodes from an image file "+
+			"in the mounted data directory. The image_path must be relative to the mounted directory. "+
+			"For targeted recognition of a specific barcode type, use recognize_barcode instead."),
+		mcp.WithInputSchema[mcpbarcode.ScanBarcodeInput](),
+	), mcpbarcode.MakeScanHandler(client, mount))
 
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "list_barcode_types",
-		Description: "List all supported barcode types for generation and recognition. " +
-			"Use this to discover valid barcode_type values for generate_barcode and recognize_barcode.",
-	}, makeListHandler())
+	s.AddTool(mcp.NewTool("list_barcode_types",
+		mcp.WithDescription("List all supported barcode types for generation and recognition. "+
+			"Use this to discover valid barcode_type values for generate_barcode and recognize_barcode."),
+		mcp.WithInputSchema[mcpbarcode.ListBarcodeTypesInput](),
+	), mcpbarcode.MakeListHandler())
 
 	// Start stdio transport
-	if err := s.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+	stdioServer := server.NewStdioServer(s)
+	if err := stdioServer.Listen(context.Background(), os.Stdin, os.Stdout); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
 }
