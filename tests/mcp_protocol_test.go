@@ -197,6 +197,93 @@ func TestMCPProtocol_CallNonexistentTool(t *testing.T) {
 	}
 }
 
+func assertToolErrorResult(t *testing.T, result *mcp.CallToolResult, err error, wantSubstring string) {
+	t.Helper()
+
+	if err != nil {
+		t.Fatalf("expected tool error result, got protocol error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected tool result, got nil")
+	}
+	if !result.IsError {
+		t.Fatalf("expected IsError result, got success: %#v", result)
+	}
+	if len(result.Content) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(result.Content))
+	}
+
+	textContent, ok := result.Content[0].(mcp.TextContent)
+	if !ok {
+		t.Fatalf("expected TextContent, got %T", result.Content[0])
+	}
+	if wantSubstring != "" && !strings.Contains(textContent.Text, wantSubstring) {
+		t.Fatalf("expected error text to contain %q, got %q", wantSubstring, textContent.Text)
+	}
+}
+
+func TestMCPProtocol_GenerateInvalidBarcodeTypeReturnsToolError(t *testing.T) {
+	s := createFullServer(t)
+	if s == nil {
+		return
+	}
+
+	cs := connectTestClient(t, s)
+
+	result, err := cs.CallTool(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "generate_barcode",
+			Arguments: map[string]any{
+				"barcode_type": "COMPLETELY_FAKE_TYPE",
+				"data":         "test",
+			},
+		},
+	})
+
+	assertToolErrorResult(t, result, err, "unsupported barcode type for generation")
+}
+
+func TestMCPProtocol_RecognizeInvalidBarcodeTypeReturnsToolError(t *testing.T) {
+	s := createFullServer(t)
+	if s == nil {
+		return
+	}
+
+	cs := connectTestClient(t, s)
+
+	result, err := cs.CallTool(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "recognize_barcode",
+			Arguments: map[string]any{
+				"image_path":   "sample.png",
+				"barcode_type": "COMPLETELY_FAKE_TYPE",
+			},
+		},
+	})
+
+	assertToolErrorResult(t, result, err, "unsupported barcode type for recognition")
+}
+
+func TestMCPProtocol_ScanEmptyImagePathReturnsToolError(t *testing.T) {
+	s := createFullServer(t)
+	if s == nil {
+		return
+	}
+
+	cs := connectTestClient(t, s)
+
+	result, err := cs.CallTool(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "scan_barcode",
+			Arguments: map[string]any{
+				"image_path": "",
+			},
+		},
+	})
+
+	assertToolErrorResult(t, result, err, "'image_path' is required")
+}
+
 func TestMCPProtocol_ToolSchemaValidation(t *testing.T) {
 	s := createTestServer()
 	cs := connectTestClient(t, s)

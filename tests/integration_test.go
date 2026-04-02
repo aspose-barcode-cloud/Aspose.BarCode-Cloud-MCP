@@ -147,6 +147,30 @@ func extractFilenameFromResponse(t *testing.T, result *mcp.CallToolResult) strin
 	return strings.TrimPrefix(line, prefix)
 }
 
+func requireToolErrorResult(t *testing.T, result *mcp.CallToolResult, err error) mcp.TextContent {
+	t.Helper()
+
+	if err != nil {
+		t.Fatalf("expected tool error result, got protocol error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected tool result, got nil")
+	}
+	if !result.IsError {
+		t.Fatalf("expected tool error result, got success: %#v", result)
+	}
+	if len(result.Content) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(result.Content))
+	}
+
+	textContent, ok := result.Content[0].(mcp.TextContent)
+	if !ok {
+		t.Fatalf("expected TextContent, got %T", result.Content[0])
+	}
+
+	return textContent
+}
+
 // TestIntegration_GenerateAndScanRoundTrip generates a QR barcode and then
 // scans it to verify the decoded value matches the input.
 func TestIntegration_GenerateAndScanRoundTrip(t *testing.T) {
@@ -393,9 +417,9 @@ func TestIntegration_InvalidBarcodeType(t *testing.T) {
 			},
 		},
 	})
-	// mcp-go returns handler errors as protocol errors
-	if err == nil && !result.IsError {
-		t.Fatal("expected error for invalid barcode type")
+	textContent := requireToolErrorResult(t, result, err)
+	if !strings.Contains(textContent.Text, "unsupported barcode type for generation") {
+		t.Fatalf("unexpected error text: %s", textContent.Text)
 	}
 }
 
@@ -459,8 +483,9 @@ func TestIntegration_ScanEmptyImagePath(t *testing.T) {
 			},
 		},
 	})
-	if err == nil && !result.IsError {
-		t.Fatal("expected error for empty image_path")
+	textContent := requireToolErrorResult(t, result, err)
+	if !strings.Contains(textContent.Text, "'image_path' is required") {
+		t.Fatalf("unexpected error text: %s", textContent.Text)
 	}
 }
 
@@ -477,8 +502,9 @@ func TestIntegration_ScanPathTraversal(t *testing.T) {
 			},
 		},
 	})
-	if err == nil && !result.IsError {
-		t.Fatal("expected error for path traversal")
+	textContent := requireToolErrorResult(t, result, err)
+	if !strings.Contains(textContent.Text, "path traversal not allowed") {
+		t.Fatalf("unexpected error text: %s", textContent.Text)
 	}
 }
 
@@ -495,8 +521,9 @@ func TestIntegration_ScanInvalidExtension(t *testing.T) {
 			},
 		},
 	})
-	if err == nil && !result.IsError {
-		t.Fatal("expected error for invalid extension")
+	textContent := requireToolErrorResult(t, result, err)
+	if !strings.Contains(textContent.Text, "unsupported image file extension") {
+		t.Fatalf("unexpected error text: %s", textContent.Text)
 	}
 }
 
