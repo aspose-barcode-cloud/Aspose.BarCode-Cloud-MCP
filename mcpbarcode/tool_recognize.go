@@ -25,14 +25,14 @@ func MakeRecognizeHandler(client *AsposeClient, mount *MountConfig) server.ToolH
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input RecognizeBarcodeInput
 		if err := request.BindArguments(&input); err != nil {
-			return nil, fmt.Errorf("invalid arguments: %w", err)
+			return toolError("invalid arguments: %v", err)
 		}
 
 		if input.ImagePath == "" {
-			return nil, fmt.Errorf("'image_path' is required")
+			return toolError("'image_path' is required")
 		}
 		if err := ValidateImageExtension(input.ImagePath); err != nil {
-			return nil, err
+			return toolError("%v", err)
 		}
 
 		// Build barcode types list
@@ -47,7 +47,7 @@ func MakeRecognizeHandler(client *AsposeClient, mount *MountConfig) server.ToolH
 				}
 				dt, err := MapDecodeType(p)
 				if err != nil {
-					return nil, err
+					return toolError("%v", err)
 				}
 				barcodeTypes = append(barcodeTypes, dt)
 			}
@@ -56,13 +56,13 @@ func MakeRecognizeHandler(client *AsposeClient, mount *MountConfig) server.ToolH
 		// Read file from mount and encode to base64
 		file, err := mount.OpenFile(input.ImagePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open image: %w", err)
+			return toolError("failed to open image: %v", err)
 		}
 		defer file.Close()
 
 		imageBytes, err := io.ReadAll(file)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read image: %w", err)
+			return toolError("failed to read image: %v", err)
 		}
 		fileBase64 := base64.StdEncoding.EncodeToString(imageBytes)
 
@@ -73,14 +73,14 @@ func MakeRecognizeHandler(client *AsposeClient, mount *MountConfig) server.ToolH
 		if input.RecognitionMode != "" {
 			mode, err := MapRecognitionMode(input.RecognitionMode)
 			if err != nil {
-				return nil, err
+				return toolError("%v", err)
 			}
 			body.RecognitionMode = mode
 		}
 		if input.RecognitionImageKind != "" {
 			kind, err := MapRecognitionImageKind(input.RecognitionImageKind)
 			if err != nil {
-				return nil, err
+				return toolError("%v", err)
 			}
 			body.RecognitionImageKind = kind
 		}
@@ -90,7 +90,7 @@ func MakeRecognizeHandler(client *AsposeClient, mount *MountConfig) server.ToolH
 			body,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("Aspose API error: %w", err)
+			return toolError("Aspose API error: %v", err)
 		}
 
 		text := FormatBarcodeResults(result)

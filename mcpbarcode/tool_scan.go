@@ -20,25 +20,25 @@ func MakeScanHandler(client *AsposeClient, mount *MountConfig) server.ToolHandle
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input ScanBarcodeInput
 		if err := request.BindArguments(&input); err != nil {
-			return nil, fmt.Errorf("invalid arguments: %w", err)
+			return toolError("invalid arguments: %v", err)
 		}
 
 		if input.ImagePath == "" {
-			return nil, fmt.Errorf("'image_path' is required")
+			return toolError("'image_path' is required")
 		}
 		if err := ValidateImageExtension(input.ImagePath); err != nil {
-			return nil, err
+			return toolError("%v", err)
 		}
 
 		file, err := mount.OpenFile(input.ImagePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open image: %w", err)
+			return toolError("failed to open image: %v", err)
 		}
 		defer file.Close()
 
 		result, _, err := client.API.ScanAPI.ScanMultipart(client.AuthCtx, file)
 		if err != nil {
-			return nil, fmt.Errorf("Aspose API error: %w", err)
+			return toolError("Aspose API error: %v", err)
 		}
 
 		text := FormatBarcodeResults(result)
