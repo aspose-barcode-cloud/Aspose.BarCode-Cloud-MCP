@@ -23,8 +23,6 @@ source:
 run:
   volumes:
     - "{{aspose-barcode-cloud.data_dir}}:/mnt/data"
-  env:
-    ASPOSE_CLOUD_MOUNT_PATH: "/mnt/data"
 config:
   description: >-
     Configure Aspose Cloud API credentials and data directory.

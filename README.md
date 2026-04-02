@@ -38,7 +38,6 @@ Add the server to your MCP client configuration.
         "run", "-i", "--rm",
         "-e", "ASPOSE_CLOUD_CLIENT_ID",
         "-e", "ASPOSE_CLOUD_CLIENT_SECRET",
-        "-e", "ASPOSE_CLOUD_MOUNT_PATH=/mnt/data",
         "-v", "/path/to/your/barcode-data:/mnt/data",
         "aspose-barcode-cloud-mcp"
       ],
@@ -62,7 +61,6 @@ Add the server to your MCP client configuration.
         "run", "-i", "--rm",
         "-e", "ASPOSE_CLOUD_CLIENT_ID",
         "-e", "ASPOSE_CLOUD_CLIENT_SECRET",
-        "-e", "ASPOSE_CLOUD_MOUNT_PATH=/mnt/data",
         "-v", "${userHome}/barcode-data:/mnt/data",
         "aspose-barcode-cloud-mcp"
       ]
@@ -130,13 +128,22 @@ Once configured, ask your AI assistant to:
 - *"Scan the barcodes in image.png"*
 - *"What barcode types are supported?"*
 
-## Environment Variables
+## Configuration
+
+### CLI Parameters
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--mount-path` | Yes | Absolute path to the data directory for file exchange |
+
+> **Note:** When using Docker, the default mount path is `/mnt/data` (set via `CMD` in the Dockerfile). To use a custom path inside the container, pass it after the image name: `docker run ... aspose-barcode-cloud-mcp --mount-path=/custom/path`
+
+### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ASPOSE_CLOUD_CLIENT_ID` | Yes | Aspose Cloud application Client ID |
 | `ASPOSE_CLOUD_CLIENT_SECRET` | Yes | Aspose Cloud application Client Secret |
-| `ASPOSE_CLOUD_MOUNT_PATH` | Yes | Absolute path to the data directory for file exchange |
 
 ## Building from Source
 
@@ -147,8 +154,7 @@ go build -o aspose-barcode-cloud-mcp .
 # Run
 export ASPOSE_CLOUD_CLIENT_ID="your-client-id"
 export ASPOSE_CLOUD_CLIENT_SECRET="your-client-secret"
-export ASPOSE_CLOUD_MOUNT_PATH="/path/to/barcode-data"
-./aspose-barcode-cloud-mcp
+./aspose-barcode-cloud-mcp --mount-path="/path/to/barcode-data"
 ```
 
 ## Running Tests

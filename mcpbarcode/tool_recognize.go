@@ -14,10 +14,10 @@ import (
 
 // RecognizeBarcodeInput defines the input parameters for the recognize_barcode tool.
 type RecognizeBarcodeInput struct {
-	ImagePath            string `json:"image_path"                             jsonschema:"description=Relative path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP). Must be relative to the mount root, e.g. 'photo.png' or 'subdir/photo.png'"`
-	BarcodeType          string `json:"barcode_type,omitempty"                 jsonschema:"description=Barcode type to look for (e.g. QR, Code128). Default: most commonly used types"`
-	RecognitionMode      string `json:"recognition_mode,omitempty"             jsonschema:"description=Recognition quality vs speed trade-off: Fast, Normal, or Excellent"`
-	RecognitionImageKind string `json:"recognition_image_kind,omitempty"       jsonschema:"description=Hint about the image source for better recognition: Photo, ScannedDocument, or ClearImage"`
+	ImagePath            string `json:"image_path"                             jsonschema:"Relative path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP). Must be relative to the mount root, e.g. 'photo.png' or 'subdir/photo.png'"`
+	BarcodeType          string `json:"barcode_type,omitempty"                 jsonschema:"Barcode type to look for (e.g. QR, Code128). Default: most commonly used types"`
+	RecognitionMode      string `json:"recognition_mode,omitempty"             jsonschema:"Recognition quality vs speed trade-off: Fast, Normal, or Excellent"`
+	RecognitionImageKind string `json:"recognition_image_kind,omitempty"       jsonschema:"Hint about the image source for better recognition: Photo, ScannedDocument, or ClearImage"`
 }
 
 // MakeRecognizeHandler creates the handler for the recognize_barcode tool.

@@ -17,8 +17,8 @@ func TestNewMountConfig_EmptyPath(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty path")
 	}
-	if !strings.Contains(err.Error(), "ASPOSE_CLOUD_MOUNT_PATH") {
-		t.Errorf("expected ASPOSE_CLOUD_MOUNT_PATH in error, got: %v", err)
+	if !strings.Contains(err.Error(), "mount path") {
+		t.Errorf("expected 'mount path' in error, got: %v", err)
 	}
 }
 

@@ -20,3 +20,4 @@ RUN apk --no-cache add ca-certificates
 COPY --from=builder /mcp-server /mcp-server
 
 ENTRYPOINT ["/mcp-server"]
+CMD ["--mount-path=/mnt/data"]

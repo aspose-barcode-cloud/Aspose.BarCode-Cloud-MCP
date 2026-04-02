@@ -18,7 +18,7 @@ type MountConfig struct {
 // Returns an error if path is empty or invalid.
 func NewMountConfig(path string) (*MountConfig, error) {
 	if path == "" {
-		return nil, fmt.Errorf("ASPOSE_CLOUD_MOUNT_PATH is required but not set")
+		return nil, fmt.Errorf("mount path is required, use --mount-path flag")
 	}
 
 	// Verify directory exists

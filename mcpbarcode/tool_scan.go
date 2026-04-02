@@ -12,7 +12,7 @@ import (
 
 // ScanBarcodeInput defines the input parameters for the scan_barcode tool.
 type ScanBarcodeInput struct {
-	ImagePath string `json:"image_path" jsonschema:"description=Relative path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP). Must be relative to the mount root, e.g. 'photo.png' or 'subdir/photo.png'"`
+	ImagePath string `json:"image_path" jsonschema:"Relative path to image file in the mounted data directory (PNG, JPEG, GIF, TIFF, or BMP). Must be relative to the mount root, e.g. 'photo.png' or 'subdir/photo.png'"`
 }
 
 // MakeScanHandler creates the handler for the scan_barcode tool.

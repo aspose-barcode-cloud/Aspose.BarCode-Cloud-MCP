@@ -133,7 +133,6 @@ func startDockerMCP(t *testing.T) *dockerMCPSession {
 		"run", "--rm", "-i",
 		"-e", "ASPOSE_CLOUD_CLIENT_ID=" + dockerCredential("ASPOSE_CLOUD_CLIENT_ID"),
 		"-e", "ASPOSE_CLOUD_CLIENT_SECRET=" + dockerCredential("ASPOSE_CLOUD_CLIENT_SECRET"),
-		"-e", "ASPOSE_CLOUD_MOUNT_PATH=/mnt/data",
 		"-v", mountDir + ":/mnt/data",
 		dockerImage,
 	}
@@ -241,7 +240,6 @@ func TestDocker_FailsWithoutCredentials(t *testing.T) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "docker", "run", "--rm",
-		"-e", "ASPOSE_CLOUD_MOUNT_PATH=/mnt/data",
 		dockerImage)
 	output, err := cmd.CombinedOutput()
 	if err == nil {
@@ -261,6 +259,7 @@ func TestDocker_FailsWithoutMountPath(t *testing.T) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "docker", "run", "--rm",
+		"--entrypoint", "/mcp-server",
 		"-e", "ASPOSE_CLOUD_CLIENT_ID=test",
 		"-e", "ASPOSE_CLOUD_CLIENT_SECRET=test",
 		dockerImage)
@@ -270,7 +269,7 @@ func TestDocker_FailsWithoutMountPath(t *testing.T) {
 	}
 
 	out := string(output)
-	if !strings.Contains(out, "ASPOSE_CLOUD_MOUNT_PATH") {
+	if !strings.Contains(out, "mount path") {
 		t.Errorf("expected mount path error message, got: %s", out)
 	}
 }

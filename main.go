@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 
@@ -16,6 +17,17 @@ const serverVersion = "0.2604.0"
 func main() {
 	log.SetOutput(os.Stderr)
 
+	// Parse CLI parameters
+	mountPath := flag.String("mount-path", "", "Absolute path to the data directory for file exchange (required)")
+	flag.Parse()
+
+	// Validate mount path first (required)
+	mount, err := mcpbarcode.NewMountConfig(*mountPath)
+	if err != nil {
+		log.Fatalf("Mount configuration error: %v", err)
+	}
+	log.Printf("Mount mode enabled: %s", mount.Path)
+
 	// Read credentials from environment
 	clientID := os.Getenv("ASPOSE_CLOUD_CLIENT_ID")
 	clientSecret := os.Getenv("ASPOSE_CLOUD_CLIENT_SECRET")
@@ -28,14 +40,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create Aspose client: %v", err)
 	}
-
-	// Read mount path configuration (required)
-	mountPath := os.Getenv("ASPOSE_CLOUD_MOUNT_PATH")
-	mount, err := mcpbarcode.NewMountConfig(mountPath)
-	if err != nil {
-		log.Fatalf("Mount configuration error: %v", err)
-	}
-	log.Printf("Mount mode enabled: %s", mount.Path)
 
 	// Create MCP server
 	s := server.NewMCPServer("aspose-barcode-cloud", serverVersion)
