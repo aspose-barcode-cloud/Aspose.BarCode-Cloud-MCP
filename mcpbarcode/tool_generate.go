@@ -30,13 +30,13 @@ func MakeGenerateHandler(client *AsposeClient, mount *MountConfig) server.ToolHa
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input GenerateBarcodeInput
 		if err := request.BindArguments(&input); err != nil {
-			return nil, fmt.Errorf("invalid arguments: %w", err)
+			return toolError("invalid arguments: %v", err)
 		}
 
 		// Map barcode type
 		barcodeType, err := MapEncodeType(input.BarcodeType)
 		if err != nil {
-			return nil, err
+			return toolError("%v", err)
 		}
 
 		// Build optional parameters
@@ -47,7 +47,7 @@ func MakeGenerateHandler(client *AsposeClient, mount *MountConfig) server.ToolHa
 		if input.ImageFormat != "" {
 			mapped, err := MapImageFormat(input.ImageFormat)
 			if err != nil {
-				return nil, err
+				return toolError("%v", err)
 			}
 			imageFormat = mapped
 		}
@@ -57,7 +57,7 @@ func MakeGenerateHandler(client *AsposeClient, mount *MountConfig) server.ToolHa
 		if input.TextLocation != "" {
 			loc, err := MapCodeLocation(input.TextLocation)
 			if err != nil {
-				return nil, err
+				return toolError("%v", err)
 			}
 			opts.TextLocation = optional.NewInterface(loc)
 		}
@@ -92,7 +92,7 @@ func MakeGenerateHandler(client *AsposeClient, mount *MountConfig) server.ToolHa
 			opts,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("Aspose API error: %w", err)
+			return toolError("Aspose API error: %v", err)
 		}
 
 		// Determine file extension and MIME type
@@ -106,7 +106,7 @@ func MakeGenerateHandler(client *AsposeClient, mount *MountConfig) server.ToolHa
 		filename := mount.GenerateFilename(input.BarcodeType, ext)
 		relPath, err := mount.WriteFile(filename, imageBytes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to save barcode image: %w", err)
+			return toolError("failed to save barcode image: %v", err)
 		}
 
 		return &mcp.CallToolResult{
