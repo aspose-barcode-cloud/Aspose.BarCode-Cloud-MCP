@@ -8,7 +8,7 @@ Barcode images are exchanged through a mounted data directory -- generated barco
 
 ## Prerequisites
 
-- [Docker](https://www.docker.com/) (recommended) or [Go 1.24+](https://go.dev/)
+- [Docker](https://www.docker.com/) (recommended) or [Go 1.25+](https://go.dev/)
 - Aspose Cloud API credentials -- get them free at [dashboard.aspose.cloud](https://dashboard.aspose.cloud/applications)
 
 ## Quick Start
